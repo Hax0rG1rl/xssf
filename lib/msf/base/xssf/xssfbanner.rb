@@ -21,16 +21,14 @@ module XssfBanner
     |:|  |       \:\/:/  /     \:\/:/  /         \/__/  
     |:|  |        \::/  /       \::/  /                 
      \|__|         \/__/         \/__/  Cross-Site Scripting Framework 
-                                      Ludovic Courgnaud - CONIX Security
-',
+                                      Ludovic Courgnaud - CONIX Security',
 '
  __  __     ______     ______     ______  
 /\_\_\_\   /\  ___\   /\  ___\   /\  ___\ 
 \/_/\_\/_  \ \___  \  \ \___  \  \ \  __\ 
   /\_\/\_\  \/\_____\  \/\_____\  \ \_\   
   \/_/\/_/   \/_____/   \/_____/   \/_/     Cross-Site Scripting Framework
-                                          Ludovic Courgnaud - CONIX Security
-',
+                                          Ludovic Courgnaud - CONIX Security',
 '
 ooooooo  ooooo  .oooooo..o  .oooooo..o oooooooooooo 
  `8888    d8\'  d8P\'    `Y8 d8P\'    `Y8 `888\'     `8 
@@ -39,8 +37,7 @@ ooooooo  ooooo  .oooooo..o  .oooooo..o oooooooooooo
    .8PY888.         `"Y88b      `"Y88b  888    "    
   d8\'  `888b   oo     .d8P oo     .d8P  888         
 o888o  o88888o 8""88888P\'  8""88888P\'  o888o   Cross-Site Scripting Framework
-                                             Ludovic Courgnaud - CONIX Security
-',
+                                             Ludovic Courgnaud - CONIX Security',
 '
  ____  ____   ______    ______   ________  
 |_  _||_  _|.\' ____ \ .\' ____ \ |_   __  | 
@@ -48,16 +45,14 @@ o888o  o88888o 8""88888P\'  8""88888P\'  o888o   Cross-Site Scripting Framework
    > `\' <    _.____`.  _.____`.   |  _|    
  _/ /\'`\ \_ | \____) || \____) | _| |_     
 |____||____| \______.\' \______.\'|_____|     Cross-Site Scripting Framework
-                                          Ludovic Courgnaud - CONIX Security
-',
+                                          Ludovic Courgnaud - CONIX Security',
 '
     _/      _/    _/_/_/    _/_/_/  _/_/_/_/   
      _/  _/    _/        _/        _/          
       _/        _/_/      _/_/    _/_/_/       
    _/  _/          _/        _/  _/            
 _/      _/  _/_/_/    _/_/_/    _/       Cross-Site Scripting Framework
-                                       Ludovic Courgnaud - CONIX Security
-'
+                                       Ludovic Courgnaud - CONIX Security'
 		]
 	def self.to_s
 		Logos[rand(Logos.length)]		

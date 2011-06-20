@@ -5,35 +5,68 @@ module Msf
 	module Xssf
 
 		### CONSTANTS ###
+		SERVER_PORT		= 8888
+		SERVER_URI 		= '/'
+		
 		VICTIM_LOOP		= 'loop'			# Loads victim malicious loop code inside page (Javascript)
 		VICTIM_ASK		= 'ask'
 		VICTIM_ANSWER	= 'answer'
+		VICTIM_SAFARI	= 'cookie_safari'	# Safari needs a first special POST insade Iframe to set Cross-Domain Cookie
 		VICTIM_TEST		= 'test.html'
-		VICTIM_LOG		= 'log.html'
+		VICTIM_GUI		= 'gui.html'
 		VICTIM_INTERVAL	= 10				# in sec (means : victim requests for new code comming from attacker each 10 seconds)
 		
 		PARAM_LOCATION	= 'location'		# Information relative to parameters in request (POST/GET)
 		PARAM_INTERVAL	= 'interval'
 		PARAM_RESPONSE	= 'response'
-		PARAM_TYPE		= 'type'			# 0 for module response, 1 for tunnel response
-		PARAM_CTYPE		= 'content_type'
+		PARAM_HEADERS	= 'headers'
 		PARAM_NAME		= 'name'
+		PARAM_RESPID	= 'responseid'		# Useful for XSSF Tunnel
 		PARAM_ID		= 'id'				# Rescue param for browser desactivating cookies
 		
-		INCLUDED_FILES = './data/xssf'
+		PARAM_GUI_PAGE		= 'guipage'			# main | banner | victims | logs | attack | stats | stat | help | helpmenu | helpdetails
+		PARAM_GUI_ACTION	= 'guiaction'		# view | (export [if log_page=attack])
+		PARAM_GUI_JSON		= 'guijson'			# if guipage=stat
+		PARAM_GUI_VICTIMID	= 'guivictimid'
+		PARAM_GUI_LOGID		= 'guilogid'
+		PARAM_GUI_EXTENTION	= 'guiextention'	# Extention of file to export
 		
-		# Files containing binary data can't be processed in javascript 
-		PROXY_FORBIDEN = [ '.jpg', '.jpeg', '.ico', '.swf', '.gif', '.tif', '.tiff', '.mov', '.mp3', '.pdf', '.doc', '.png']
+		XSSF_FROM_OUTSIDE	= [false]			# Defines if XSSF GUI pages or Tunnel are accessible from internet (Default is only by local machine running MSF)
+		XSSF_DEBUG_MODE		= [false]			# Defines if XSSF debug mode is activated (default does not display exceptions)
 		
-		AUTO_ATTACKS = []					# Automated attacks for XSSF
+		INCLUDED_FILES = Config.data_directory + '/xssf'
+		XSSF_GUI_FILES = '/gui/'
+		XSSF_LOG_FILES = '/logs/'
 		
-		TUNNEL = []							# Informations relative to Xssf Tunnel
+		AUTO_ATTACKS = []					# Automated attacks for XSSF (cleared when closing XSSF)
+		
+		TUNNEL = Hash.new					# Information relative to XSSF Tunnel
 		TUNNEL_LOCKED = Mutex.new			# Manages accesses to TUNNEL
+		TUNNEL_TIMEOUT= 10
+		
+		
+		#								    TUNNEL
+		#         	---------------------------------------------------------
+		#			|  id  |     code     |   response   |      headers     |
+		#			---------------------------------------------------------
+		#			---------------------------------------------------------	
+		#			|  01  |     AJAX     |   abcdefgh   |      headers     |
+		#			---------------------------------------------------------	
+		#			|  02  |     AJAX     |   xyzhrjeu   |      headers     |
+		#			---------------------------------------------------------	
+		#			|  ..  |     ....     |   ........   |   ............   |
+		#
+		#
+		#   Tunnel = { 	'id' => [code, response, headers],
+		#				'01' => [AJAX, abcdefgh, headers]}
+		# 	When tunneled victim asks : concatenate and send all codes where (code != nil). Sets all sents to nil
     end
 end
 
-require 'msf/base/xssf/xssfproxy'
+require 'msf/base/xssf/xssfbanner'
+require 'msf/base/xssf/xssftunnel'
 require 'msf/base/xssf/xssfdatabase'
+require 'msf/base/xssf/xssfgui'
 require 'msf/base/xssf/xssfmaster'
 require 'msf/base/xssf/xssfserver'
-require 'msf/base/xssf/xssfbanner'
+

