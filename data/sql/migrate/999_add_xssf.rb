@@ -6,7 +6,7 @@ class AddXssf < ActiveRecord::Migration
 			t.boolean	:active
 			t.string    :ip
 			t.integer	:interval
-			t.string	:location
+			t.text		:location
 			t.datetime	:first_request
 			t.datetime  :last_request
 			t.boolean	:tunneled
@@ -15,28 +15,28 @@ class AddXssf < ActiveRecord::Migration
 			t.string	:os_name
 			t.string	:os_version
 			t.string	:arch
-			t.string	:current_attack_url
+			t.text		:current_attack_url
 			t.string	:cookie
 		end
 		
 		create_table :xssf_waiting_attacks do |t|
 			t.integer   :xssf_victim_id, :required => true
-			t.string	:url
-			t.string	:name
+			t.text		:url
+			t.text		:name
 		end
 
 		create_table :xssf_logs do |t|
 			t.integer   :xssf_victim_id, :required => true
 			t.datetime	:time
-			t.string	:result	
-			t.string	:name
+			t.text		:result
+			t.text		:name
 		end
 
 
 		create_table :xssf_servers do |t|
 			t.string	:host
 			t.integer	:port
-			t.string	:uri
+			t.text		:uri
 			t.boolean	:active
 		end
 	end

