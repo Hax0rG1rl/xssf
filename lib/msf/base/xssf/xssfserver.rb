@@ -55,7 +55,7 @@ module Xssf
 			rescue ::Interrupt
 				print_error("Auxiliary interrupted by the console user")
 			rescue ::Exception
-				print_error("Error 2: #{$!}") if XSSF_DEBUG_MODE[0]
+				print_error("Error : #{$!}")
 			end
 		end
 	end

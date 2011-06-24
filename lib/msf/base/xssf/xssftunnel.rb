@@ -29,7 +29,7 @@ module Msf
 					id = nil;	timeout_request = TUNNEL_TIMEOUT	# Keeping TUNNEL_TIMEOUT secs to execute on client side and have response
 
 					TUNNEL_LOCKED.synchronize {						# One thread at time
-						id = add_request_in_tunnel(resource, req.request_method.upcase, body)
+						id = add_request_in_tunnel(uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s, req.request_method.upcase, body)
 						print_status("ADDING '#{req.request_method.upcase}' REQUEST IN TUNNEL FOR  '#{uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s}' (#{id.to_s})")
 					}
 

