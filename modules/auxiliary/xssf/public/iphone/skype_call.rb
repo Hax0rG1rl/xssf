@@ -10,8 +10,8 @@ class Metasploit3 < Msf::Auxiliary
 	# Module initialization
 	def initialize(info = {})
 		super(update_info(info,
-			'Name'        => 'Google Chrome FileJacking',
-			'Description' => 'This module permits to steal victim\'s files on Google Chrome',
+			'Name'        => 'Skype Call',
+			'Description' => 'This module permits to launch a phone call on IPhone Skype'
 		))
 		
 		register_options(
