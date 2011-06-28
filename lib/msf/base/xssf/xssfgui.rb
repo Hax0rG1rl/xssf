@@ -10,7 +10,7 @@ module Msf
 			# Build graphical HTML interface (logs and statistics)
 			#
 			def build_log_page(req, res)
-				if ((req.remote_ip == self.serverHost) or XSSF_FROM_OUTSIDE[0])
+				if ((req.peeraddr[3] == self.serverHost) or XSSF_FROM_OUTSIDE[0])
 					case req.query["#{PARAM_GUI_PAGE}"]
 						when /^banner$/
 							XSSF_RESP(res, get_html_banner())

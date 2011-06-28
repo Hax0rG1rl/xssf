@@ -602,7 +602,7 @@ module Msf
 										<input type="hidden" name="#{PARAM_GUI_ACTION}" value="export">
 									</form>
 								</center>
-								<br /><h3 style="color:cyan"> Received result: </h3><pre style="color:white">#{(File.open(INCLUDED_FILES + XSSF_LOG_FILES + DBManager::XssfLog.find(logid).result, "rb") {|io| io.read }).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')}</pre>
+								<br /><h3 style="color:cyan"> Received result: </h3><div style="color:white">#{(File.open(INCLUDED_FILES + XSSF_LOG_FILES + DBManager::XssfLog.find(logid).result, "rb") {|io| io.read }).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')}</div>
 							}
 						end
 					rescue

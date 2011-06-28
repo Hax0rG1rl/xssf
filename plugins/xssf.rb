@@ -35,7 +35,9 @@ module Msf
 				add_console_dispatcher(ConsoleCommandDispatcher)
 				print_line("%cya" + Xssf::XssfBanner.to_s + "%clr\n\n")
 				print_good("Server started : http://#{Rex::Socket.source_address('1.2.3.4')}:#{port}#{uri}\n")
-				print_status("Please, inject '#{"http://#{Rex::Socket.source_address('1.2.3.4')}:#{port}#{uri}"}loop' or '#{"http://<PUBLIC-IP>:#{port}#{uri}loop"}' resource in an XSS") 
+				print_status("Please, inject '#{"http://#{Rex::Socket.source_address('1.2.3.4')}:#{port}#{uri}"}loop' or '#{"http://<PUBLIC-IP>:#{port}#{uri}loop"}' resource in an XSS")
+
+				print_error("Your ruby version is #{RUBY_VERSION.to_s}. Recommended version is 1.9.2 or higher!") unless (RUBY_VERSION.to_s =~ /^1\.9/)
 			rescue
 				raise PluginLoadError.new("Error starting server : #{$!}")
 			end
@@ -158,10 +160,10 @@ module Msf
 				
 						print_status("Creating new tunnel with victim '#{args[0].to_s}' (#{uri.scheme}://#{uri.host}:#{uri.port}) ...")
 						print_status("You can now add XSSF Server as your browser proxy and visit domain of victim '#{args[0].to_s}' ! ;-)\n")
-						print_error("NOTE : Other HTTP domains are also accessible through XSSF Tunnel, but user session won't be available\n")
+						print_status("NOTE : Other HTTP domains are also accessible through XSSF Tunnel, but user session won't be available\n")
 						
 						if (uri.scheme == 'https')
-							print_error("IMPORTANT : Victim domain is HTTPs! Please use HTTP protocol instead (example: #{uri.scheme}://#{uri.host}:#{uri.port} => http://#{uri.host}/)")
+							print_status("IMPORTANT : Victim domain is HTTPs! Please use HTTP protocol instead (example: #{uri.scheme}://#{uri.host}:#{uri.port} => http://#{uri.host}/)")
 						end
 
 						while (victim_tunneled) do; 	Rex::ThreadSafe.sleep(5);	end

