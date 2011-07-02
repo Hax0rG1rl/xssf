@@ -12,15 +12,15 @@ module Msf
 
 			clean_database;	Msf::Xssf::AUTO_ATTACKS.clear
 
-			@DefaultPort = Msf::Xssf::SERVER_PORT;		@DefaultUri  = Msf::Xssf::SERVER_URI;		@DefaultDebug	=	false;	@defaultPublic = false;	@defaultQuiet = false;
+			@DefaultPort = Msf::Xssf::SERVER_PORT;		@DefaultUri  = Msf::Xssf::SERVER_URI;	@defaultPublic = false;	@defaultMode = 'Normal';
 
 			# Check if parameters are correct if entered
 			opts['Port'].to_s 	=~ /^(6553[0-5]|655[0-2]\d|65[0-4]\d\d|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3}|0)$/ ? port = opts['Port'] : port = @DefaultPort
 			opts['Uri'].to_s  	=~ /^\/?([a-zA-Z0-9\-\._\?\,\'\/\\\+&amp;%\$#\=~])+$/ ? uri = opts['Uri'].to_s : uri = @DefaultUri
-			opts['Debug'].to_s  =~ /^true$/ ? Msf::Xssf::XSSF_DEBUG_MODE[0] = true : Msf::Xssf::XSSF_DEBUG_MODE[0] = @DefaultDebug
 			
 			opts['Public'].to_s =~ /^true$/ ? Msf::Xssf::XSSF_PUBLIC[0] = true : Msf::Xssf::XSSF_PUBLIC[0] = @DefaultPublic
-			opts['Quiet'].to_s =~ /^true$/ ? Msf::Xssf::XSSF_QUIET_MODE[0] = true : Msf::Xssf::XSSF_QUIET_MODE[0] = @DefaultQuiet
+			
+			opts['Mode'].to_s =~ /^(Quiet|Normal|Verbose|Debug)$/i ? Msf::Xssf::XSSF_MODE[0] = $1 : Msf::Xssf::XSSF_MODE[0] = @DefaultMode
 			
 			uri = '/' + uri if (uri[0].chr  != "/")
 			uri = uri + '/' if (uri[-1].chr != "/")
@@ -306,7 +306,7 @@ module Msf
 				if (args.length == 1)	
 					raise "Wrong arguments: [LogID] must be an Integer" unless (args[0].to_s =~ /^([0-9]+)$/)
 				
-					print_good("Result stored on log#{args[0].to_s}:")
+					print_good("Result stored on log #{args[0].to_s}:")
 					puts get_log_content(args[0].to_i)
 				else
 					print_error("Wrong arguments: xssf_logs [LogID]")

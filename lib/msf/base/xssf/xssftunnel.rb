@@ -30,7 +30,7 @@ module Msf
 
 					TUNNEL_LOCKED.synchronize {						# One thread at time
 						id = add_request_in_tunnel(uri1.query ? uri1.path.to_s + "?" + uri1.query.to_s : uri1.path.to_s, req.request_method.upcase, body)
-						print_status("ADDING '#{req.request_method.upcase}' REQUEST IN TUNNEL FOR  '#{uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s}' (#{id.to_s})") if not XSSF_QUIET_MODE[0]
+						print_status("ADDING '#{req.request_method.upcase}' REQUEST IN TUNNEL FOR  '#{uri1.query ? uri1.path.to_s + "?" + CGI::unescape(uri1.query.to_s) : uri1.path.to_s}' (#{id.to_s})") if not (XSSF_MODE[0] =~ /^Quiet$/i)
 					}
 
 					begin
@@ -94,7 +94,7 @@ module Msf
 						                                                    })
 					    client.close
 					rescue
-						print_error("Error 3: #{$!}") if XSSF_DEBUG_MODE[0]
+						print_error("Error 3: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					end
 				
 				end

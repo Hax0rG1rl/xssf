@@ -17,11 +17,11 @@ module Xssf
 
 			register_options(
 				[
-					OptString.new('VictimIDs'	, [false, 'IDs of the victims you want to receive the code.\nExamples : 1, 3-5 / ALL / NONE', 'ALL'])
+					OptString.new('VictimIDs', [true, 'IDs of the victims you want to receive the code.\nExamples : 1, 3-5 / ALL / NONE', 'ALL'])
 				], Msf::Xssf::XssfServer
 			)
 			
-			deregister_options('SSL', 'SSLVersion')		# Won't work with
+			deregister_options('SSL', 'SSLVersion')		# Won't work with XSSF
 		end
 
 

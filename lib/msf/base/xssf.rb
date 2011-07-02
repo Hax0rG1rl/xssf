@@ -34,8 +34,11 @@ module Msf
 		PARAM_GUI_EXTENTION	= 'guiextention'	# Extention of file to export
 		
 		XSSF_PUBLIC		= [false]			# Defines if XSSF GUI pages or Tunnel are accessible from internet (Default is only by local machine running MSF)
-		XSSF_DEBUG_MODE	= [false]			# Defines if XSSF debug mode is activated (default does not display exceptions)
-		XSSF_QUIET_MODE	= [false]			# Defines if XSSF quiet mode if activated. If activated, status messages about modules execution and tunnel won't be displayed
+		XSSF_MODE		= ['Normal']		# Quiet / Normal / Verbose / Debug : Defines XSSF attack messages. 
+												# Quiet mode does not display anything. 
+												# Normal mode displays attacks and tunnel status messages only. 
+												# Verbose mode displays all 'Normal' mode messages plus received results from victims
+												# Debug mode displays all 'Verbose' mode messages plus XSSF exceptions error messages if exceptions are trigered (should not :-) )
 		
 		INCLUDED_FILES = Config.data_directory + '/xssf'
 		XSSF_RRC_FILES = '/resources/'

@@ -162,7 +162,7 @@
 		<table width="100%" height="100%" cellpadding="0" cellspacing="0">
 			<tr valign="top">
 				<td width="250px">
-					<ul id="menu" style="position: fixed; top: 0px; left: 0px;">
+					<ul id="menu" style="position: absolute; top: 0px; left: 0px;">
 						<li>Users Guide
 							<ol>
 								<li><a style="cursor:pointer;" id="1" onclick="display(1);">&#183; Install XSSF</a></li>
@@ -192,6 +192,7 @@
 						<td><img src="./fr.png" width=20% style="cursor:pointer" onclick="change_lang('fr');"/></td>
 					</tr></table>
 					</ul>
+					&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 				</td>
 				
 				<td>
@@ -301,34 +302,54 @@
 					<!-- ############ -->
 					<div id="D2uk" style='color:white; display:none; text-align:justify;'>
 						<h2 style='color:cyan;'><center>Start XSSF</center></h2>
-						<b style="color:red">PREREQUISITES:</b> Before starting XSSF, please make sure you started Metasploit Framework.<br/><br/>
+						<OL>
+							<LI>Start Metasploit Framework (MSF Console for example).</LI>
+							<LI>Connect to a database if that's not automatically done.</LI>
+							<LI>Load XSSF plugin using the command '<span style='color:green;'>load xssf'.</LI>
+							<UL>
+								<LI>XSSF server port can be modified using the command '<span style='color:green;'>load xssf Port=80</span>'.</LI>
+								<LI>XSSF server URI can be changed using the command '<span style='color:green;'>load xssf Uri=/</span>'.</LI>
+								<LI>Remote access to XSSF GUI and Tunnel can be activated using the command '<span style='color:green;'>load xssf Public=true</span>'.</LI>
+								<LI>XSSF mode for information messages can be changed using the command '<span style='color:green;'>load xssf Mode=???</span>'. Information messages are displayed during attacks or during tunnel transferts. Accepted modes are:</LI>
+								<UL>
+									<LI><span style='color:green;'>Quiet</span>: Does not display anything.</LI>
+									<LI><span style='color:green;'>Normal</span>: Displays attacks and tunnel status messages only (default mode).</LI>
+									<LI><span style='color:green;'>Verbose</span>: Displays all 'Normal' mode messages plus received results from victims.</LI>
+									<LI><span style='color:green;'>Debug</span>: Displays all 'Verbose' mode messages plus XSSF exceptions error messages if exceptions are trigered (should not :-) ). </LI>
+								</UL>
+							</UL>
+						</OL>
+						<b style="color:red">EXAMPLE:</b> To launch XSSF on port 80, on /xssf/ uri, with attacker's interfaces (GUI, Tunnel) available from remote and with all messages displayed from attacks, just launch XSSF with the command '<span style='color:green;'>load xssf Port=80 Uri=/xssf/ Public=true Mode=Verbose</span>'.<br/>
 						
-						&nbsp;&nbsp;&nbsp;&nbsp;First step before starting XSSF is to choose a database driver and connect to this database. Please read XSSF installation to install the desired database and connect to it inside MSF.<br/>
-						&nbsp;&nbsp;&nbsp;&nbsp;Once database is connected, you can start XSSF running the MSF command <span style='color:green;'>load xssf</span>. Command accepts some optional parameters: <ul>
-							<li>XSSF server port can be modified using the command '<span style='color:green;'>load xssf ServerPort=80</span>'. Default value is 8888.</li>
-							<li>XSSF server URI can be changed using the command '<span style='color:green;'>load xssf ServerUri=/xssf/</span>'. Default value is /</li>
-							<li>XSSF debug mode can be activated using the command '<span style='color:green;'>load xssf Debug=true</span>'.</li>
-							<li>Remote access to XSSF GUI and Tunnel can be activated using the command '<span style='color:green;'>load xssf Public=true</span>'.</li>
-							<li>Quiet XSSF mode while using attack commands or tunnel can be activated using the command '<span style='color:green;'>load xssf Quiet=true</span>'.</li>
-						</ul><br/>
-						<center><img src="./start.png"/></center><br/><br/>
-						<b style="color:red">IMPORTANT:</b> Remember that you'll have to run Metasploit Framework in administrator mode to run XSSF on ports below 1024. In addition, if XSSF returns databases errors at this point, please make sure last Ruby, Rubygem and database driver versions are installed on system (Linux users).
+						<br/><br/><center><img src="./start.png"/></center><br/><br/>
+						<b style="color:red">NOTE:</b> Launching XSSF victims' server on port 'x' will launch attacker' server on port 'x + 1'. Attacker' server is useful to access web GUI (logs, stats, etc.) and to access XSSF Tunnel. <br/>
+						<b style="color:red">IMPORTANT:</b> Remember that you'll have to run Metasploit Framework in administrator mode to run XSSF on ports below 1024. In addition, if XSSF returns databases errors at this point, please make sure last Ruby, Rubygem and database driver versions are installed on your system.
 					</div>
 					
 					<div id="D2fr" style='color:white; display:none; text-align:justify;'>
 						<h2 style='color:cyan;'><center>Lancer XSSF</center></h2>
-						<b style="color:red">PREREQUIS :</b> Avant de démarrer XSSF, assurez-vous d'avoir lancé le Framework Metasploit.<br/><br/>
+						<OL>
+							<LI>Lancer le Framework Metasploit (MSF Console par exemple).</LI>
+							<LI>Connecter MSF à une base de données si cela n'est pas fait automatiquement.</LI>
+							<LI>Charger XSSF en utilisant la commande '<span style='color:green;'>load xssf'.</LI>
+							<UL>
+								<LI>Le port du serveur XSSF peut être modifié en utilisant la commande '<span style='color:green;'>load xssf Port=80</span>'.</LI>
+								<LI>L'URI du serveur XSSF peut être modifiée en utilisant la commande '<span style='color:green;'>load xssf Uri=/</span>'.</LI>
+								<LI>L'accès distant à la GUI XSSF et au Tunnel XSSF peut être activé en utilisant la commande '<span style='color:green;'>load xssf Public=true</span>'.</LI>
+								<LI>Le mode d'XSSF concernant l'affichage des messages peut être changé en utilisant la commande '<span style='color:green;'>load xssf Mode=???</span>'. Les messages d'information sont affichés pendant les attaques ou les transferts dans le tunnel. Les paramètres acceptés sont :</LI>
+								<UL>
+									<LI><span style='color:green;'>Quiet</span> : N'affiche aucun message.</LI>
+									<LI><span style='color:green;'>Normal</span> : Affiche le status des attaques et du tunnel seulement (mode par défaut).</LI>
+									<LI><span style='color:green;'>Verbose</span> : Affiche tout les messages du mode 'Normal' plus les résultats reçus des victimes directement dans la console.</LI>
+									<LI><span style='color:green;'>Debug</span> : Affiche tout les messages du mode 'Verbose' plus les messages d'erreurs à l'intérieur des exceptions XSSF si elles sont déclanchées (ne devraient pas :-) ). </LI>
+								</UL>
+							</UL>
+						</OL>
+						<b style="color:red">EXEMPLE:</b> Pour lancer XSSF sur le port 80, l'URI /xssf/, avec l'interface attaquant (GUI, tunnel) accessible à distance et avec tous les messages affichés dans la console, lancer XSSF avec la commande '<span style='color:green;'>load xssf Port=80 Uri=/xssf/ Public=true Mode=Verbose</span>'.<br/>
 						
-						&nbsp;&nbsp;&nbsp;&nbsp;Pour lancer XSSF correctement, la première chose à faire est de choisir le driver de base de données que l'on désire utiliser et de se connecter à cette base de données. Merci de vous reporter à la section d'installation de XSSF pour les instructions concernant la connexion à la base de données dans MSF.<br/>
-						&nbsp;&nbsp;&nbsp;&nbsp;Une fois la base de données connectée, XSSF peut être lancé grâce à la commande <span style='color:green;'>load xssf</span>. La commande accepte quelques paramètres optionnels: <ul>
-							<li>Le port du serveur XSSF peut être modifié en utilisant la commande '<span style='color:green;'>load xssf ServerPort=80</span>'. La valeur par défaut est 8888.</li>
-							<li>La racine du serveur XSSF peut être modifiée en utilisant la commande '<span style='color:green;'>load xssf ServerUri=/xssf/</span>'. La valeur par défaut est /</li>
-							<li>Le mode de debug peut s'activer à l'aide de la commande '<span style='color:green;'>load xssf Debug=true</span>'.</li>
-							<li>L'accès distant à l'interface graphique et au tunnel XSSF peuvent être activés à l'aide de la commande '<span style='color:green;'>load xssf Public=true</span>'.</li>
-							<li>Le mode silencieux de XSSF lors des attaques et de la tunnelisation peut être activé avec la commande '<span style='color:green;'>load xssf Quiet=true</span>'.</li>
-						</ul><br/>
-						<center><img src="./start.png"/></center><br/><br/>
-						<b style="color:red">IMPORTANT:</b> Pour lancer le serveur XSSF sur des ports inférieurs à 1024, il est impératif de lancer le Framework Metasploit en tant qu'administrateur. De plus, si XSSF retourne des erreurs relatives à la base de données lors du chargement du plugin, assurez-vous que les dernières versions de Ruby, Rubygem et des drivers de base de données correspondant sont correctement installés (Utilisateurs Linux).
+						<br/><br/><center><img src="./start.png"/></center><br/><br/>
+						<b style="color:red">NOTE:</b> Le lancement du serveur XSSF pour les victimes sur le port 'x' entrainera le lancement du serveur pour l''attaquant sur le port 'x + 1'. Le serveur attaquant est utile pour accéder aux pages de la GUI (logs, stats, etc.) ainsi qu'au Tunnel XSSF). <br/>
+						<b style="color:red">IMPORTANT:</b> Afin de lancer le serveur XSSF sur des ports inférieurs à 1024, il est nécessaire de lancer le Framework Metasploit en tant qu'administrateur. De plus, si XSSF retourne des erreurs de base de données lors du chargement, assurez vous d'avoir des versions à jour de Ruby, Rubygems et des drivers correspondants pour la base de données installés sur votre système.
 					</div>
 					
 					
@@ -378,7 +399,7 @@
 							<li> <span style='color:green;'>xssf_victims</span> : Affiche toute les victimes</li>
 							<li> <span style='color:green;'>xssf_active_victims</span> : Affiche les victimes actives</li>
 							<li> <span style='color:green;'>xssf_information [VictimID]</span> : Affiche les informations relatives à une victime donnée</li>
-							<li> <span style='color:green;'>xssf_servers</span> : Affiche la liste des serveurs déjàutilisés</li>
+							<li> <span style='color:green;'>xssf_servers</span> : Affiche la liste des serveurs déjà utilisés</li>
 							<li> <span style='color:green;'>xssf_logs [VictimID]</span>: Affiche la liste des logs d'une victime donnée</li>
 							<li> <span style='color:green;'>xssf_log [LogID]</span>: Affiche le log avec l'identifiant donné</li><br/>
 							

@@ -72,7 +72,7 @@ module Msf
 						:cookie 			=> "NO"
 					).id
 				rescue
-					print_error("Error 4: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 4: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return nil
@@ -85,7 +85,7 @@ module Msf
 				begin
 					return  DBManager::XssfVictim.find(id)
 				rescue
-					print_error("Error 5: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 5: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return nil
@@ -100,7 +100,7 @@ module Msf
 					DBManager::XssfServer.create(:host 	=> host, :port 	=> port, :uri	=> uri,	:active	=> true) if (DBManager::XssfServer.update_all({:active => true}, ["host = ? AND port = ? AND uri = ?", host, port, uri]) == 0)
 					return true
 				rescue
-					print_error("Error 6: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 6: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return false
 				end
 			end
@@ -113,7 +113,7 @@ module Msf
 					server = DBManager::XssfServer.find(:first, :conditions => [ "active = ?", true])
 					return [server.host, server.port, server.uri]
 				rescue
-					print_error("Error 7: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 7: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return nil
@@ -135,7 +135,7 @@ module Msf
 						end
 					end
 				rescue
-					print_error("Error 8: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 8: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 
@@ -158,7 +158,7 @@ module Msf
 					print_line
 					print_line table.to_s
 				rescue
-					print_error("Error 9: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 9: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 
@@ -170,7 +170,7 @@ module Msf
 					DBManager::XssfVictim.update_all({:current_attack_url => nil, :tunneled => false})
 					DBManager::XssfWaitingAttack.delete_all
 				rescue
-					print_error("Error 10: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 10: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 
@@ -187,7 +187,7 @@ module Msf
 					end
 					
 				rescue
-					print_error("Error 11: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 11: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 
@@ -244,7 +244,7 @@ module Msf
 						return nil
 					end
 				rescue
-					print_error("Error 12: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 12: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return nil
 				end
 			end
@@ -265,7 +265,7 @@ module Msf
 						end
 					end
 				rescue
-					print_error("Error 13: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 13: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 			
@@ -284,7 +284,7 @@ module Msf
 						return nil
 					end
 				rescue
-					print_error("Error 14: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 14: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return nil
 				end
 			end
@@ -302,7 +302,7 @@ module Msf
 					TUNNEL.clear
 					return victim
 				rescue
-					print_error("Error 15: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 15: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return nil
@@ -315,7 +315,7 @@ module Msf
 				begin
 					return DBManager::XssfVictim.find(:first, :conditions => [ "tunneled = ? AND active = ?", true, true])
 				rescue
-					print_error("Error 16: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 16: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return nil
@@ -344,7 +344,7 @@ module Msf
 					begin
 						DBManager::XssfVictim.update(id, {:last_request => Time.now.strftime("%Y-%m-%d %H:%M:%S"), :active => true, :cookie => cookie})
 					rescue
-						print_error("Error 17: #{$!}") if XSSF_DEBUG_MODE[0]
+						print_error("Error 17: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					end
 				end
 			end
@@ -361,15 +361,15 @@ module Msf
 						victims.has_key?(v.xssf_victim_id) ? (victims[v.xssf_victim_id] = victims[v.xssf_victim_id] + 1) : (victims[v.xssf_victim_id] = 1)
 					end
 				rescue
-					print_error("Error 18: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 18: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				if (not victims.empty?)
 					str = "Remaining victims to attack: "
 					victims.each_pair {|key, value| str << "[#{key} (#{value})] " }
-					print_good(str) if not XSSF_QUIET_MODE[0]
+					print_good(str) if not (XSSF_MODE[0] =~ /^Quiet$/i)
 				else
-					print_good("Remaining victims to attack: NONE") if not XSSF_QUIET_MODE[0]
+					print_good("Remaining victims to attack: NONE") if not (XSSF_MODE[0] =~ /^Quiet$/i)
 				end
 			end
 
@@ -381,7 +381,7 @@ module Msf
 				begin
 					return DBManager::XssfWaitingAttack.count(:conditions => ["xssf_victim_id = ?", id])
 				rescue
-					print_error("Error 19: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 19: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return 0
 				end
 			end
@@ -394,7 +394,7 @@ module Msf
 				html = %Q{
 					<html><body bgcolor=black style="color:cyan; font-family: monospace">
 						<pre>#{Xssf::XssfBanner::Logos[2]}</pre><h3 style="position:absolute; right:1%; top:75%" align="right"><u>msf ></u> _</h3>
-						<table width="300" height="35" style="border: 1px solid green; position:absolute; right:250px; top:50%">
+						<table width="300" height="35" style="border: 1px solid green; position:absolute; left:450px; top:30%">
 							<tr align=center>
 								<td width="33%" onMouseover="this.bgColor='green'" onMouseout="this.bgColor='black'"
 								onClick="parent.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=main';" style="cursor:pointer; border: 1px solid green;">LOGS</td>
@@ -514,7 +514,7 @@ module Msf
 						end
 					end
 				rescue
-					print_error("Error 20: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 20: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return html + "</table></body><html>"
@@ -573,7 +573,7 @@ module Msf
 							end
 						end
 					rescue
-						print_error("Error 21: #{$!}") if XSSF_DEBUG_MODE[0]
+						print_error("Error 21: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					end
 				end
 				
@@ -606,7 +606,7 @@ module Msf
 							}
 						end
 					rescue
-						print_error("Error 22: #{$!}") if XSSF_DEBUG_MODE[0]
+						print_error("Error 22: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					end
 				end
 				
@@ -773,7 +773,7 @@ module Msf
 					v = DBManager::XssfVictim.find(id)
 					return [v.browser_name.to_s, v.browser_version.to_f, v.os_version.to_s]
 				rescue
-					print_error("Error 23: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 23: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return ["Unknown", "0"]
@@ -787,7 +787,7 @@ module Msf
 				begin
 					return File.open(INCLUDED_FILES + XSSF_LOG_FILES + DBManager::XssfLog.find(logid).result, "rb") {|io| io.read }
 				rescue
-					print_error("Error 24: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 24: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return nil
 				end
 			end
@@ -857,7 +857,7 @@ module Msf
 						DBManager::XssfVictim.delete_all
 					end
 				rescue
-					print_error("Error 25: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 25: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 		end

