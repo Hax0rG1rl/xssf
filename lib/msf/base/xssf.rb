@@ -10,7 +10,7 @@ require 'msf/base/xssf/webrickpatches'
 module Msf
 	module Xssf
 
-		XSSF_VERSION	= '2.1'
+		XSSF_VERSION	= '2.2'
 		
 		### CONSTANTS ###
 		SERVER_PORT		= 8888
