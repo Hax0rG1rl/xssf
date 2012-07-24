@@ -1,6 +1,12 @@
 #
 # XSSF management
 #
+require 'msf/base/xssf/xssftunnel'
+require 'msf/base/xssf/xssfdatabase'
+require 'msf/base/xssf/xssfgui'
+require 'msf/base/xssf/xssfmaster'
+require 'msf/base/xssf/xssfserver'
+require 'msf/base/xssf/webrickpatches'
 module Msf
 	module Xssf
 
@@ -72,10 +78,3 @@ end
 
 
 require 'msf/base/xssf/xssfbanner'
-require 'msf/base/xssf/xssftunnel'
-require 'msf/base/xssf/xssfdatabase'
-require 'msf/base/xssf/xssfgui'
-require 'msf/base/xssf/xssfmaster'
-require 'msf/base/xssf/xssfserver'
-require 'msf/base/xssf/webrickpatches'
-
