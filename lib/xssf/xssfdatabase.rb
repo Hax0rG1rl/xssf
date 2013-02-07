@@ -1,4 +1,4 @@
-require 'msf/core/model_xssf'
+require 'xssf/model_xssf'
 
 #
 # This class implements a HTTP Server used for the new XSSF plugin.

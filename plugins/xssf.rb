@@ -1,3 +1,5 @@
+require 'xssf/xssfmaster'
+
 module Msf
 
 	# This plugin manages a new XSS framework integrated to Metasploit

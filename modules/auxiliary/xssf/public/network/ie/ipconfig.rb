@@ -1,5 +1,5 @@
 require 'msf/core'
-require 'msf/base/xssf'        
+require 'xssf/xssfmaster'      
 
 #
 # READ README_XSSF FILE FOR MORE INFORMATION ABOUT MODULES
