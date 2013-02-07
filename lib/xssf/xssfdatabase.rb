@@ -1,5 +1,15 @@
 require 'xssf/model_xssf'
 
+module ActiveRecord
+  	module AttributeMethods
+    		def attribute_missing(match, *args, &block)
+	      		# REMOVING DEPRECATION WARNING...
+				# TODO: CHECK WHY THIS FUNCTION IS TRIGGERED WHEN USING XSSF...
+      			super
+    		end
+	end
+end
+
 #
 # This class implements a HTTP Server used for the new XSSF plugin.
 #
