@@ -193,7 +193,7 @@ module Msf
 					victim = get_victim(args[0])
 					
 					if (victim)
-						secs = (victim.last_request - victim.first_request).to_i;
+						secs = (Time.parse(victim.last_request) - Time.parse(victim.first_request)).to_i;
 						
 						print_line
 						print_line "INFORMATION ABOUT VICTIM #{args[0]}"

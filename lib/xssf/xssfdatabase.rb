@@ -457,7 +457,7 @@ module Msf
 				begin
 					DBManager::XssfVictim.find(:all, :order => "id ASC").each do |v|
 						begin
-							secs = (v.last_request - v.first_request).to_i;
+							secs = (Time.parse(v.last_request) - Time.parse(v.first_request)).to_i;
 							
 							html << %Q{
 								<tr style="color:#{v.active ? "green" : "red"}; font-family: monospace" align=left>
