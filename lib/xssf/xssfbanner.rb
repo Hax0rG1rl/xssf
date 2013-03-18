@@ -52,7 +52,7 @@ o888o  o88888o 8""88888P\'  8""88888P\'  o888o  Cross-Site Scripting Framework '
       _/        _/_/      _/_/    _/_/_/       
    _/  _/          _/        _/  _/            
 # _/      _/  _/_/_/    _/_/_/    _/     Cross-Site Scripting Framework '+XSSF_VERSION+'
-                                       Ludovic Courgnaud - CONIX Security'
+                                         Ludovic Courgnaud - CONIX Security'
 		]
 	def self.to_s
 		Logos[rand(Logos.length)]		

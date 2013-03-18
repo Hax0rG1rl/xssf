@@ -1,86 +1,285 @@
-require 'xssf/model_xssf'
-
-module ActiveRecord
-  	module AttributeMethods
-    		def attribute_missing(match, *args, &block)
-	      		# REMOVING DEPRECATION WARNING...
-				# TODO: CHECK WHY THIS FUNCTION IS TRIGGERED WHEN USING XSSF...
-      			super
-    		end
-	end
-end
+require 'yaml'
 
 #
-# This class implements a HTTP Server used for the new XSSF plugin.
+# This class implements Database used for XSSF plugin.
+#
+# TODO: IMPLEMENT MUTEX FOR DB OBJECTS ACCESSES IF ISSUED
 #
 module Msf
 	module Xssf
-		module XssfDatabase	
+		module XssfDatabase
 
+			#     ----------------------------                    ----------------------------
+			#     |        xssf_log          |                    |      xssf_victim         |
+			#     ----------------------------                    ----------------------------
+			#     |  id                      |                    |  id                      |
+			#     |  victim_id               |____________________|  server_id               |
+			#     |  ...                     |*                  1|  ...                     |
+			#     ----------------------------                    ----------------------------
+			#                                                  / *            1|
+			#                                               /                  |
+			#                                            /                     |
+			#                                         /                        |
+			#                                      /                           |
+			#                                   /                             *|
+			#     ----------------------------  1                 ----------------------------
+			#     |      xssf_server         |                    |    xssf_waiting_attack   |
+			#     ----------------------------                    ----------------------------
+			#     |  id                      |                    |  id                      |
+			#     |  ...                     |                    |  victim_id               |
+			#     |                          |                    |  ...                     |
+			#     ----------------------------                    ----------------------------
+
+			XSSF_VICTIM_DB 		= Array.new
+			XSSF_VICTIM_HASH = {
+				"ID" 			=> 0,
+				"SERVER_ID" 		=> 1,
+				"IP"			=> 2,
+				"ACTIVE"		=> 3,
+				"INTERVAL" 		=> 4,
+				"LOCATION" 		=> 5,
+				"FIRST_REQUEST" 	=> 6,
+				"LAST_REQUEST" 		=> 7,
+				"TUNNELED" 		=> 8,
+				"BROWSER_NAME" 		=> 9,
+				"BROWSER_VERSION" 	=> 10,
+				"OS_NAME" 		=> 11,
+				"OS_VERSION" 		=> 12,
+				"ARCH" 			=> 13,
+				"CURRENT_ATTACK_URL" 	=> 14,
+				"COOKIE" 		=> 15}
+
+			XSSF_LOG_DB 		= Array.new
+			XSSF_LOG_HASH = {
+				"ID"			=> 0,
+				"VICTIM_ID"		=> 1,
+				"NAME"			=> 2,
+				"TIME"			=> 3,
+				"RESULT"		=> 4}
+				
+			XSSF_SERVER_DB 		= Array.new
+			XSSF_SERVER_HASH = {
+				"ID"			=> 0,
+				"HOST"			=> 1,
+				"PORT"			=> 2,
+				"URI"			=> 3,
+				"ACTIVE"		=> 4}
+	
+			XSSF_WAITING_ATTACKS_DB	= Array.new
+			XSSF_WAITING_ATTACKS_HASH = {
+				"ID"			=> 0,
+				"VICTIM_ID"		=> 1,
+				"URL"			=> 2,
+				"NAME"			=> 3}
+
+			#
+			# Returns last id from given table
+			#
+			def last_id(table, table_hash)
+				if (table.length > 0)
+					return (table[-1][table_hash["ID"]]).to_i
+				else
+					return 0
+				end
+			end
+
+			#
+			# Updates all fields within table with given value and given conditions
+			#
+			def update_all(table, table_hash, values = {}, conditions = {})
+			        ctx = 0
+				len = table.length - 1
+				
+				for i in 0..len
+					update = true
+					
+					conditions.each do |key, val|
+						if (table[i][table_hash[key]] != val)
+							update = false
+							break
+						end
+					end
+					
+					if (update)
+						values.each do |field, val|
+							table[i][table_hash[field]] = val
+						end
+						ctx = ctx + 1
+					end
+				end
+				
+				return ctx
+			end
+
+			#
+			# Returns first value from table corresponding to conditions
+			#
+			def find(table, table_hash, conditions = {})
+				len = table.length - 1
+				
+				for i in 0..len
+					found = true
+					
+					conditions.each do |key, val|
+						if (table[i][table_hash[key]] != val)
+						 	found = false
+							break
+						end
+					end
+					
+					if (found)
+						return table[i]
+					end
+				end
+				
+				return nil
+			end
+
+			#
+			# Returns values from table corresponding to conditions
+			#
+			def find_all(table, table_hash, conditions = {})
+				res = []
+				len = table.length - 1
+				
+				for i in 0..len
+					found = true
+					
+					conditions.each do |key, val|
+						if (table[i][table_hash[key]] != val)
+							found = false
+							break
+						end
+					end
+					
+					if (found)
+						res << table[i]
+					end
+				end
+				
+				return res
+			end
+			
+			#
+			# Count all table elements matching with given condition
+			#
+			def count_all(table, table_hash, conditions = {})
+				ctx = 0
+				len = table.length - 1
+				
+				for i in 0..len
+					found = true
+					
+					conditions.each do |key, val|
+						if (table[i][table_hash[key]] != val)
+							found = false
+							break
+						end
+					end
+					
+					if (found)
+						ctx = ctx + 1
+					end
+				end
+				
+				return ctx
+			end
+			
+			#
+			# Clear all data from given table
+			#
+			def delete_all(table)
+				table.clear
+			end
+
+			#
+			# Clear data from given table with given conditions
+			#
+			def delete(table, table_hash, conditions = {})
+				len = table.length - 1
+
+				len.downto(0) { |i|
+				        del = true
+				              
+					conditions.each do |key, val|
+						if (table[i][table_hash[key]] != val)
+							del = false
+							break
+						end
+					end
+   
+					if (del)
+						table.delete_at(i)
+					end
+				}
+			end
+			
 			#
 			# Saves a victim in the database
 			#
 			def add_victim(ip, interval, ua)
 				case (ua)
-					when /version\/(\d+\.\d+[\.\d+]*).*safari/;							ua_name = "SAFARI";				ua_version = $1
-					when /firefox\/((:?[0-9]+\.)+[0-9]+)/;								ua_name = "Firefox";			ua_version = $1
+					when /version\/(\d+\.\d+[\.\d+]*).*safari/;				ua_name = "SAFARI";		ua_version = $1
+					when /firefox\/((:?[0-9]+\.)+[0-9]+)/;					ua_name = "Firefox";		ua_version = $1
 					when /mozilla\/[0-9]\.[0-9] \(compatible; msie ([0-9]\.[0-9]+)/;	ua_name = "Internet Explorer";	ua_version = $1
-					when /chrome\/((:?[0-9]+\.)+[0-9]+)/;								ua_name = "Google Chrome";		ua_version = $1
-					when /opera\/((:?[0-9]+\.)+[0-9]+)/;								ua_name = "Opera";				ua_version = $1
-					else 																ua_name = "Unknown";			ua_version = "Unknown"
+					when /chrome\/((:?[0-9]+\.)+[0-9]+)/;					ua_name = "Google Chrome";	ua_version = $1
+					when /opera\/((:?[0-9]+\.)+[0-9]+)/;					ua_name = "Opera";		ua_version = $1
+					else 									ua_name = "Unknown";		ua_version = "Unknown"
 				end
 				
 				case (ua)
 					when /windows/;		os_name = "Windows";	arch = "ARCH_X86"
-					when /linux/;		os_name = "Linux";		arch = "Unknown"
+					when /linux/;		os_name = "Linux";	arch = "Unknown"
 					when /iphone/;		os_name = "MAC OSX";	arch = "armle"
 					when /mac os x/;	os_name = "MAC OSX";	arch = "Unknown"
-					else				os_name = "Unknown";	arch = "Unknown"
+					else			os_name = "Unknown";	arch = "Unknown"
 				end
 				
 				case (ua)
-					when /windows 95/;			os_version = '95'
-					when /windows 98/;			os_version = '98'
+					when /windows 95/;		os_version = '95'
+					when /windows 98/;		os_version = '98'
 					when /windows nt 4/;		os_version = 'NT'
 					when /windows nt 5.0/;		os_version = '2000'
 					when /windows nt 5.1/;		os_version = 'XP'
 					when /windows nt 5.2/;		os_version = '2003'
 					when /windows nt 6.0/;		os_version = 'Vista'
 					when /windows nt 6.1/;		os_version = '7'
-					when /gentoo/;				os_version = 'Gentoo'
-					when /debian/;				os_version = 'Debian'
-					when /ubuntu/;				os_version = 'Ubuntu'
+					when /gentoo/;			os_version = 'Gentoo'
+					when /debian/;			os_version = 'Debian'
+					when /ubuntu/;			os_version = 'Ubuntu'
 					when /android\s(\d+\.\d+)/;	os_version = 'Android (' + $1 + ')'
-					else						os_version = 'Unknown'
+					else				os_version = 'Unknown'
 				end
 				
 				case (ua)
-					when /ppc/;			arch = "ARCH_PPC"
+					when /ppc/;		arch = "ARCH_PPC"
 					when /x64|x86_64/;	arch = "ARCH_X86_64"
 					when /i.86|wow64/;	arch = "ARCH_X86"
-					else				arch = "ARCH_X86"
+					else			arch = "ARCH_X86"
 				end
 
 				begin
-					server = DBManager::XssfServer.find(:first, :conditions => [ "active = ?", true ])
+					server = find(XSSF_SERVER_DB, XSSF_SERVER_HASH, {"ACTIVE" => true})
+					last_id = last_id(XSSF_VICTIM_DB, XSSF_VICTIM_HASH)
 					
-					return DBManager::XssfVictim.create(
-						:xssf_server_id 	=> server.id,
-						:ip 				=> ip,
-						:active 			=> true,
-						:interval 			=> (interval <= 0) ? 1 : ((interval >= 600) ? 600 : interval),
-						:location 			=> "Unknown",
-						:first_request 		=> Time.now.strftime("%Y-%m-%d %H:%M:%S"),
-						:last_request 		=> Time.now.strftime("%Y-%m-%d %H:%M:%S"),
-						:tunneled 			=> false,
-						:browser_name 		=> ua_name,
-						:browser_version 	=> ua_version.slice!(0..15) ,
-						:os_name 			=> os_name,
-						:os_version 		=> os_version.slice!(0..15) ,
-						:arch 				=> arch,
-						:current_attack_url => nil,
-						:cookie 			=> "NO"
-					).id
+					XSSF_VICTIM_DB << [last_id + 1,
+					                   server[XSSF_SERVER_HASH["ID"]].to_i,
+					                   ip,
+					                   true,
+					                   (interval <= 0) ? 1 : ((interval >= 600) ? 600 : interval),
+					                   "Unknown",
+					                   Time.now.strftime("%Y-%m-%d %H:%M:%S"),
+					                   Time.now.strftime("%Y-%m-%d %H:%M:%S"),
+					                   false,
+					                   ua_name,
+					                   ua_version.slice!(0..15),
+					                   os_name,
+					                   os_version.slice!(0..15),
+					                   arch,
+					                   nil,
+					                   "NO"]
+					
+					return last_id + 1
 				rescue
 					print_error("Error 4: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -93,7 +292,7 @@ module Msf
 			#
 			def get_victim(id)
 				begin
-					return  DBManager::XssfVictim.find(id)
+					return find(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ID" => id.to_i})
 				rescue
 					print_error("Error 5: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -106,8 +305,11 @@ module Msf
 			#
 			def register_server(host, port, uri)
 				begin
-					DBManager::XssfServer.update_all({:active => false})		
-					DBManager::XssfServer.create(:host 	=> host, :port 	=> port, :uri	=> uri,	:active	=> true) if (DBManager::XssfServer.update_all({:active => true}, ["host = ? AND port = ? AND uri = ?", host, port, uri]) == 0)
+					update_all(XSSF_SERVER_DB, XSSF_SERVER_HASH, {"ACTIVE" => false})
+					if (update_all(XSSF_SERVER_DB, XSSF_SERVER_HASH, {"ACTIVE" => true}, {"HOST" => host, "PORT" => port, "URI" => uri}) == 0)
+						XSSF_SERVER_DB << [last_id(XSSF_SERVER_DB, XSSF_SERVER_HASH) + 1, host, port.to_i, uri, true]
+					end
+					
 					return true
 				rescue
 					print_error("Error 6: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
@@ -120,8 +322,8 @@ module Msf
 			#
 			def active_server
 				begin
-					server = DBManager::XssfServer.find(:first, :conditions => [ "active = ?", true])
-					return [server.host, server.port, server.uri]
+					server = find(XSSF_SERVER_DB, XSSF_SERVER_HASH, {"ACTIVE" => true})
+					return [server[XSSF_SERVER_HASH["HOST"]], server[XSSF_SERVER_HASH["PORT"]], server[XSSF_SERVER_HASH["URI"]]]
 				rescue
 					print_error("Error 7: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -135,11 +337,13 @@ module Msf
 			#
 			def update_active_victims
 				begin
-					DBManager::XssfVictim.find(:all).each do |v|
+				        find_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH).each do |v|
 						begin
-							((((Time.now.strftime("%Y-%m-%d %H:%M:%S").to_datetime - v.last_request.to_datetime).to_f * 100000).to_i) > (v.interval + 5).to_i) ? v.active = false : v.active = true
-
-							v.save!
+							if ((((Time.now.strftime("%Y-%m-%d %H:%M:%S").to_datetime - v[XSSF_VICTIM_HASH["LAST_REQUEST"]].to_datetime).to_f * 100000).to_i) > (v[XSSF_VICTIM_HASH["INTERVAL"]] + 5).to_i)
+								v[XSSF_VICTIM_HASH["ACTIVE"]] = false
+							else
+								v[XSSF_VICTIM_HASH["ACTIVE"]] = true
+							end
 						rescue
 							next
 						end
@@ -152,21 +356,30 @@ module Msf
 			#
 			# Display a database table
 			#
-			def show_table(name, klass, conditions = ["1 = 1"], delete = [])
-				begin
-					default_columns = klass.column_names
+			def show_table(name, table, table_hash, conditions = {}, delete = [])
+			  	begin
+					default_columns = []
+					table_hash.each do |key, val|
+						default_columns << key
+					end
 					
 					delete.each do |i| ; default_columns.delete_if {|v| (v == i)} ; end
 					
-					table = Rex::Ui::Text::Table.new({'Header'  => name, 'Columns' => default_columns})
+					tbl = Rex::Ui::Text::Table.new({'Header'  => name, 'Columns' => default_columns})
 					
-					klass.find(:all, :conditions => conditions, :order => "id ASC").each do |o|
-						columns = default_columns.map { |n| o.attributes[n] || "" }
-						table << columns
+					len1 = table.length - 1
+					len2 = default_columns.length - 1
+				
+					find_all(table, table_hash, conditions).each do |victim|
+						line = []
+						for i in 0..len2
+							line << victim[table_hash[default_columns[i]]].to_s
+						end
+						tbl << line
 					end
 							
 					print_line
-					print_line table.to_s
+					print_line tbl.to_s
 				rescue
 					print_error("Error 9: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -177,8 +390,8 @@ module Msf
 			#
 			def clean_database
 				begin
-					DBManager::XssfVictim.update_all({:current_attack_url => nil, :tunneled => false})
-					DBManager::XssfWaitingAttack.delete_all
+					update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"CURRENT_ATTACK_URL" => nil, "TUNNELED" => false})
+					delete_all(XSSF_WAITING_ATTACKS_DB) 
 				rescue
 					print_error("Error 10: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -190,8 +403,8 @@ module Msf
 			def clean_victim(id)
 				begin
 					if (id && (id != ''))
-						DBManager::XssfVictim.update(id, {:current_attack_url => nil, :tunneled => false})
-						DBManager::XssfWaitingAttack.delete_all([ "xssf_victim_id = ?", id])
+						update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"CURRENT_ATTACK_URL" => nil, "TUNNELED" => false}, {"ID" => id.to_i})
+						delete(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"VICTIM_ID" => id.to_i}) 
 					else
 						clean_database
 					end
@@ -201,13 +414,15 @@ module Msf
 				end
 			end
 
-
 			#
 			# Creates a new attack log in the database
 			#
 			def create_log(victimID, result, name)
-				DBManager::XssfLog.create(:xssf_victim_id => victimID, :name => name, :time => Time.now.strftime("%Y-%m-%d %H:%M:%S"), :result => result)
-				# Error => Managed at top level
+				XSSF_LOG_DB << [last_id(XSSF_LOG_DB, XSSF_LOG_HASH) + 1,
+				                victimID.to_i,
+					        name,
+					        Time.now.strftime("%Y-%m-%d %H:%M:%S"),
+					        result]
 			end
 			
 			#
@@ -216,22 +431,20 @@ module Msf
 			def attack_victim(id, url, name)		
 				begin
 					if (id && (id != ''))
-						if ((DBManager::XssfVictim.find(id)).active)
-							DBManager::XssfWaitingAttack.create(
-									:xssf_victim_id => id,
-									:url => url,
-									:name => name
-							)
+						if (find(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ID" => id.to_i})[XSSF_VICTIM_HASH["ACTIVE"]])
+							XSSF_WAITING_ATTACKS_DB << [last_id(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH) + 1,
+							                            id.to_i,
+							                            url,
+							                            name]
 						else
 							print_error("Victim '#{id}' is no longer active ! ")
 						end
 					else
-						DBManager::XssfVictim.find(:all, :conditions => [ "active = ?", true]).each do |v|
-							DBManager::XssfWaitingAttack.create(
-								:xssf_victim_id => v.id,
-								:url => url,
-								:name => name
-							)
+						find_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ACTIVE" => true}).each do |v|
+							  XSSF_WAITING_ATTACKS_DB << [last_id(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH) + 1,
+							                              v[XSSF_VICTIM_HASH["ID"]].to_i,
+							                              url,
+							                              name]
 						end
 					end
 					return true
@@ -246,10 +459,10 @@ module Msf
 			#
 			def current_attack(id)
 				begin
-					id ? v = (DBManager::XssfVictim.find(id)) : v = nil
+					id ? v = (find(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ID" => id.to_i})) : v = nil
 					
 					if (v)
-						return v.current_attack_url
+						return v[XSSF_VICTIM_HASH["CURRENT_ATTACK_URL"]]
 					else
 						return nil
 					end
@@ -264,14 +477,13 @@ module Msf
 			#
 			def add_auto_attacks(id)
 				begin
-					Msf::Xssf::AUTO_ATTACKS.each do |a|
+					AUTO_ATTACKS.each do |a|
 						if (obj = framework.jobs[a])
 							url = "http://#{(obj.ctx[0].datastore['SRVHOST'] == '0.0.0.0' ? Rex::Socket.source_address('1.2.3.4') : obj.ctx[0].datastore['SRVHOST'])}:#{obj.ctx[0].datastore['SRVPORT']}#{obj.ctx[0].get_resource}"
-							DBManager::XssfWaitingAttack.create(
-								:xssf_victim_id => id,
-								:url => url,
-								:name => obj.name
-							)
+							XSSF_WAITING_ATTACKS_DB << [last_id(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH) + 1,
+							                            id.to_i,
+							                            url,
+							                            obj.name]
 						end
 					end
 				rescue
@@ -284,12 +496,12 @@ module Msf
 			#
 			def get_first_attack(id)
 				begin
-					attack = DBManager::XssfWaitingAttack.find(:first, :conditions => [ "xssf_victim_id = ?", id])
+					attack = find(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"VICTIM_ID" => id.to_i})
 
 					if (attack)
-						DBManager::XssfVictim.update(id, {:current_attack_url => attack.url})
-						DBManager::XssfWaitingAttack.delete(attack.id)
-						return [attack.url, attack.name]
+						update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"CURRENT_ATTACK_URL" => attack[XSSF_WAITING_ATTACKS_HASH["URL"]]}, {"ID" => id.to_i})
+						delete(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"ID" => attack[XSSF_WAITING_ATTACKS_HASH["ID"]]})
+						return [attack[XSSF_WAITING_ATTACKS_HASH["URL"]], attack[XSSF_WAITING_ATTACKS_HASH["NAME"]]]
 					else
 						return nil
 					end
@@ -304,13 +516,16 @@ module Msf
 			#
 			def tunnel_victim(id)
 				begin
-					DBManager::XssfWaitingAttack.delete_all([ "xssf_victim_id = ?", id])
-					victim = DBManager::XssfVictim.find(id, :conditions => [ "active = ?", true])
-					victim.tunneled = true
-					victim.save!
-					
+					delete(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"VICTIM_ID" => id.to_i})
+					ctx = update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"TUNNELED" => true}, {"ID" => id.to_i, "ACTIVE" => true})
+
 					TUNNEL.clear
-					return victim
+					
+					if (ctx == 0)
+						return nil
+					else
+						return victim_tunneled
+					end
 				rescue
 					print_error("Error 15: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -323,7 +538,7 @@ module Msf
 			#
 			def victim_tunneled
 				begin
-					return DBManager::XssfVictim.find(:first, :conditions => [ "tunneled = ? AND active = ?", true, true])
+					return find(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"TUNNELED" => true, "ACTIVE" => true})
 				rescue
 					print_error("Error 16: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -346,13 +561,13 @@ module Msf
 				
 				begin
 					if (interval)
-						DBManager::XssfVictim.update(id, {:last_request => Time.now.strftime("%Y-%m-%d %H:%M:%S"), :active => true, :interval => interval, :location => location, :cookie => cookie})
+						update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"LAST_REQUEST" => Time.now.strftime("%Y-%m-%d %H:%M:%S"), "ACTIVE" => true, "INTERVAL" => interval, "LOCATION" => location, "COOKIE" => cookie}, {"ID" => id.to_i})
 					else
-						DBManager::XssfVictim.update(id, {:last_request => Time.now.strftime("%Y-%m-%d %H:%M:%S"), :active => true, :location => location, :cookie => cookie})
+					  	update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"LAST_REQUEST" => Time.now.strftime("%Y-%m-%d %H:%M:%S"), "ACTIVE" => true, "LOCATION" => location, "COOKIE" => cookie}, {"ID" => id.to_i})
 					end
 				rescue
 					begin
-						DBManager::XssfVictim.update(id, {:last_request => Time.now.strftime("%Y-%m-%d %H:%M:%S"), :active => true, :cookie => cookie})
+						update_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"LAST_REQUEST" => Time.now.strftime("%Y-%m-%d %H:%M:%S"), "ACTIVE" => true, "COOKIE" => cookie}, {"ID" => id.to_i})
 					rescue
 						print_error("Error 17: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					end
@@ -367,8 +582,8 @@ module Msf
 				begin
 					victims = Hash.new("victims")
 
-					DBManager::XssfWaitingAttack.find(:all, :order => "xssf_victim_id ASC").each do |v|
-						victims.has_key?(v.xssf_victim_id) ? (victims[v.xssf_victim_id] = victims[v.xssf_victim_id] + 1) : (victims[v.xssf_victim_id] = 1)
+					find_all(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH).each do |wa|
+						victims.has_key?([XSSF_WAITING_ATTACKS_HASH["VICTIM_ID"]]) ? (victims[[XSSF_WAITING_ATTACKS_HASH["VICTIM_ID"]]] = victims[[XSSF_WAITING_ATTACKS_HASH["VICTIM_ID"]]] + 1) : (victims[[XSSF_WAITING_ATTACKS_HASH["VICTIM_ID"]]] = 1)
 					end
 				rescue
 					print_error("Error 18: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
@@ -389,7 +604,7 @@ module Msf
 			#
 			def count_waiting_attacks(id)
 				begin
-					return DBManager::XssfWaitingAttack.count(:conditions => ["xssf_victim_id = ?", id])
+					return count_all(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"VICTIM_ID" => id.to_i})
 				rescue
 					print_error("Error 19: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return 0
@@ -455,18 +670,18 @@ module Msf
 				}
 				
 				begin
-					DBManager::XssfVictim.find(:all, :order => "id ASC").each do |v|
+					find_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH).each do |v|
 						begin
-							secs = (Time.parse((v.last_request).to_s) - Time.parse((v.first_request).to_s)).to_i;
+							secs = (Time.parse((v[XSSF_VICTIM_HASH["LAST_REQUEST"]]).to_s) - Time.parse((v[XSSF_VICTIM_HASH["FIRST_REQUEST"]]).to_s)).to_i;
 							
 							html << %Q{
-								<tr style="color:#{v.active ? "green" : "red"}; font-family: monospace" align=left>
-									<td width=10%><span id="#{v.id}x" onClick="doMenu('#{v.id}')" style="cursor:pointer">[+]</span></td>
-									<td width=35%><span onClick="parent.fr2.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=logs&#{PARAM_GUI_VICTIMID}=#{v.id}'; parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack'" style="cursor:pointer"><b>Victim #{v.id}</b></span></td>
-									<td width=35%><span onClick="parent.fr2.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=logs&#{PARAM_GUI_VICTIMID}=#{v.id}'; parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack'" style="cursor:pointer"><b>#{v.ip}</b></span></td>
+								<tr style="color:#{v[XSSF_VICTIM_HASH["ACTIVE"]] ? "green" : "red"}; font-family: monospace" align=left>
+									<td width=10%><span id="#{v[XSSF_VICTIM_HASH["ID"]]}x" onClick="doMenu('#{v[XSSF_VICTIM_HASH["ID"]]}')" style="cursor:pointer">[+]</span></td>
+									<td width=35%><span onClick="parent.fr2.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=logs&#{PARAM_GUI_VICTIMID}=#{v[XSSF_VICTIM_HASH["ID"]]}'; parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack'" style="cursor:pointer"><b>Victim #{v[XSSF_VICTIM_HASH["ID"]]}</b></span></td>
+									<td width=35%><span onClick="parent.fr2.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=logs&#{PARAM_GUI_VICTIMID}=#{v[XSSF_VICTIM_HASH["ID"]]}'; parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack'" style="cursor:pointer"><b>#{v[XSSF_VICTIM_HASH["IP"]]}</b></span></td>
 							}
 							
-							case v.os_name
+							case v[XSSF_VICTIM_HASH["OS_NAME"]]
 								when /Windows/i
 									html << %Q{<td width=10% align=center><img width="25px" src="#{XSSF_GUI_FILES}win.png" alt="Windows" /></td>}
 								when /Linux/i
@@ -477,7 +692,7 @@ module Msf
 									html << %Q{<td width=10% align=center><img width="25px" src="#{XSSF_GUI_FILES}unknown.png" alt="Unknown" /></td>}
 							end
 							
-							case v.browser_name
+							case v[XSSF_VICTIM_HASH["BROWSER_NAME"]]
 								when /SAFARI/i
 									html << %Q{<td width=10% align=center><img width="25px" src="#{XSSF_GUI_FILES}safari.png" alt="SAFARI" /></td>}
 								when /Firefox/i
@@ -493,30 +708,30 @@ module Msf
 							end
 					
 							html << %Q{
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Active ?</div></td>			<td COLSPAN=3 style="color:purple;">#{v.active ? "TRUE" : "FALSE"}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">IP Address</div></td>		<td COLSPAN=3 style="color:purple;">#{v.ip}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">OS Name</div></td>			<td COLSPAN=3 style="color:purple;">#{v.os_name}</td>
-								</tr> <tr style="display:none;" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">OS Version</div></td>		<td COLSPAN=3 style="color:purple;">#{v.os_version}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Architecture</div></td>		<td COLSPAN=3 style="color:purple;">#{v.arch}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Browser name</div></td>		<td COLSPAN=3 style="color:purple;">#{v.browser_name}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Browser version</div></td>	<td COLSPAN=3 style="color:purple;">#{v.browser_version}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Location</div></td>			<td COLSPAN=3 style="color:purple;"><span onclick="window.open('#{v.location}')" style="cursor:pointer"><u>Go!</u></span></td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">XSSF cookie ?</div></td>		<td COLSPAN=3 style="color:purple;">#{(v.cookie == "YES") ? "TRUE" : "FALSE"}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">First request</div></td>		<td COLSPAN=3 style="color:purple;">#{v.first_request}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Last Request</div></td>		<td COLSPAN=3 style="color:purple;">#{v.last_request}</td>
-								</tr> <tr style="display:none" id="#{v.id}" align=center>
-									<td COLSPAN=2><div style="color:white">Connection time</div></td>	<td COLSPAN=3 style="color:purple;">#{secs/3600}hr #{secs/60 % 60}min #{secs % 60}sec</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Active ?</div></td>			<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["ACTIVE"]] ? "TRUE" : "FALSE"}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">IP Address</div></td>			<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["IP"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">OS Name</div></td>			<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["OS_NAME"]]}</td>
+								</tr> <tr style="display:none;" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">OS Version</div></td>			<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["OS_VERSION"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Architecture</div></td>		<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["ARCH"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Browser name</div></td>		<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["BROWSER_NAME"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Browser version</div></td>		<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["BROWSER_VERSION"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Location</div></td>			<td COLSPAN=3 style="color:purple;"><span onclick="window.open('#{v[XSSF_VICTIM_HASH["LOCATION"]]}')" style="cursor:pointer"><u>Go!</u></span></td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">XSSF cookie ?</div></td>		<td COLSPAN=3 style="color:purple;">#{(v[XSSF_VICTIM_HASH["COOKIE"]] == "YES") ? "TRUE" : "FALSE"}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">First request</div></td>		<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["FIRST_REQUEST"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Last Request</div></td>		<td COLSPAN=3 style="color:purple;">#{v[XSSF_VICTIM_HASH["LAST_REQUEST"]]}</td>
+								</tr> <tr style="display:none" id="#{v[XSSF_VICTIM_HASH["ID"]]}" align=center>
+									<td COLSPAN=2><div style="color:white">Connection time</div></td>		<td COLSPAN=3 style="color:purple;">#{secs/3600}hr #{secs/60 % 60}min #{secs % 60}sec</td>
 								</tr>
 							}
 						rescue
@@ -567,19 +782,19 @@ module Msf
 						<center>
 							<h3 style="color:cyan"> Victim #{id} attacks </h3>
 							<table cellpadding=0 cellspacing=0 border=0 width=70% align=center style="font-family: monospace; color:cyan"><tr>
-									<td><input type="radio" name="sel" value="0" onclick="displayPage(0);"> 		All			</td>
+									<td><input type="radio" name="sel" value="0" onclick="displayPage(0);"> 		All		</td>
 									<td><input type="radio" name="sel" value="1" onclick="displayPage(1);"> 		Launched	</td>
-									<td><input type="radio" name="sel" value="2" onclick="displayPage(2);" checked> Results		</td>
+									<td><input type="radio" name="sel" value="2" onclick="displayPage(2);" checked> 	Results		</td>
 							</tr></table>
 						</center>
 					}
 					
 					begin
-						DBManager::XssfLog.find(:all, :conditions => [ "xssf_victim_id = ?", id], :order => "id ASC").each do |l|
-							if (l.name == nil)
-								html << %Q{	<div id="0" style="color:orange; display:none"><h4> [LOG #{l.id}]: #{URI.unescape(l.result).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')} (#{l.time}) </h4></div>	}
+						find_all(XSSF_LOG_DB, XSSF_LOG_HASH, {"VICTIM_ID" => id.to_i}).each do |l|
+							if (l[XSSF_LOG_HASH["NAME"]] == nil)
+								html << %Q{ <div id="0" style="color:orange; display:none"><h4> [LOG #{l[XSSF_LOG_HASH["ID"]]}]: #{URI.unescape(l[XSSF_LOG_HASH["RESULT"]]).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')} (#{l[XSSF_LOG_HASH["TIME"]]}) </h4></div>	}
 							else
-								html << %Q{ <span id="1" onClick="parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack&#{PARAM_GUI_LOGID}=#{l.id}'" style="cursor:pointer; color:green"><h4> [LOG #{l.id}] : #{CGI::escapeHTML(l.name)} (#{l.time}) </h4></span> }
+								html << %Q{ <span id="1" onClick="parent.fr3.location='#{VICTIM_GUI}?#{PARAM_GUI_PAGE}=attack&#{PARAM_GUI_LOGID}=#{l[XSSF_LOG_HASH["ID"]]}'" style="cursor:pointer; color:green"><h4> [LOG #{l[XSSF_LOG_HASH["ID"]]}] : #{CGI::escapeHTML(l[XSSF_LOG_HASH["NAME"]])} (#{l[XSSF_LOG_HASH["TIME"]]}) </h4></span> }
 							end
 						end
 					rescue
@@ -599,7 +814,7 @@ module Msf
 				
 				if (logid && (logid != 0))
 					begin
-						if (log = DBManager::XssfLog.find(logid))
+						if (log = find(XSSF_LOG_DB, XSSF_LOG_HASH, {"ID" => logid}))
 							html << %Q{
 								<center>
 									<h3 style="color:cyan"> Attack log #{logid} </h3>
@@ -612,7 +827,7 @@ module Msf
 										<input type="hidden" name="#{PARAM_GUI_ACTION}" value="export">
 									</form>
 								</center>
-								<br /><h3 style="color:cyan"> Received result: </h3><div style="color:white">#{(File.open(INCLUDED_FILES + XSSF_LOG_FILES + DBManager::XssfLog.find(logid).result, "rb") {|io| io.read }).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')}</div>
+								<br /><h3 style="color:cyan"> Received result: </h3><div style="color:white">#{(File.open(INCLUDED_FILES + XSSF_LOG_FILES + log[XSSF_LOG_HASH["RESULT"]], "rb") {|io| io.read }).gsub(/[<>]/, '<' => '&lt;', '>' => '&gt;')}</div>
 							}
 						end
 					rescue
@@ -685,67 +900,67 @@ module Msf
 			# Builds graphs data in real time for statistic page
 			#
 			def build_json(json)
-				begin; code = ""; 	table = Hash.new; 	str = "";	victims = DBManager::XssfVictim.find(:all); rescue; end
+				begin; code = ""; 	table = Hash.new; 	str = "";	victims = find_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH); rescue; end
 				
 				colours = %Q{ 	"0x336699", "0x88AACC", "0x999933", "0x666699", "0xCC9933", "0x006666", "0x3399FF", "0x993300", "0xAAAA77", "0x666666", "0xFFCC66", "0x6699CC",
-								"0x663366", "0x9999CC", "0xAAAAAA", "0x669999", "0xBBBB55", "0xCC6600", "0x9999FF", "0x0066CC", "0x99CCCC", "0x999999", "0xFFCC00", "0x009999",
-								"0x99CC33", "0xFF9900", "0x999966", "0x66CCCC", "0x339966", "0xCCCC33"	}
+						"0x663366", "0x9999CC", "0xAAAAAA", "0x669999", "0xBBBB55", "0xCC6600", "0x9999FF", "0x0066CC", "0x99CCCC", "0x999999", "0xFFCC00", "0x009999",
+						"0x99CC33", "0xFF9900", "0x999966", "0x66CCCC", "0x339966", "0xCCCC33"	}
 				case json
 					when /^gr1$/			# Active / Non active victims
 						total = 0;		active = 0;
 						
 						begin
-							total = DBManager::XssfVictim.count(:all);	active = DBManager::XssfVictim.count(:conditions => ["active = ?", true])
+							total = count_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH);	active = count_all(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ACTIVE" => true})
 						rescue
 							total = 0;	active = 0
 						end
 				
-						code = %Q{ { "elements": [ { "type": "pie", "start-angle": 50, "animate": [ { "type": "fade" },{ "type": "bounce", "distance": 20 } ],
-												"on-show": false, "gradient-fill": true, "colours" : ["#00FF00", "#FF0000"], "tip": "#label#\n#val# of #total# (#percent#)", 
-												"no-labels": true, "values": [ { "value": #{active}, "label": "Connected", "label-colour": "#00FF00" }, 
-												{ "value": #{total - active}, "label": "Disconnected", "label-colour": "#FF0000" }] } ], "bg_colour" : "#000000", 
-												"title": { "text": "Active victims",  "style": "color: #00EEEE; font-size: 20px" } }
+						code = %Q{ { 	"elements": [ { "type": "pie", "start-angle": 50, "animate": [ { "type": "fade" },{ "type": "bounce", "distance": 20 } ],
+								"on-show": false, "gradient-fill": true, "colours" : ["#00FF00", "#FF0000"], "tip": "#label#\n#val# of #total# (#percent#)", 
+								"no-labels": true, "values": [ { "value": #{active}, "label": "Connected", "label-colour": "#00FF00" }, 
+								{ "value": #{total - active}, "label": "Disconnected", "label-colour": "#FF0000" }] } ], "bg_colour" : "#000000", 
+								"title": { "text": "Active victims",  "style": "color: #00EEEE; font-size: 20px" } }
 								}
 						
 					when /^gr2$/			# Victims location
-						victims.each do |v|;	begin;	table[v.location] ? table[v.location] += 1 : table[v.location] = 1;	rescue;	next;	end;	end
+						victims.each do |v|;	begin;	table[v[XSSF_VICTIM_HASH["LOCATION"]]] ? table[v[XSSF_VICTIM_HASH["LOCATION"]]] += 1 : table[v[XSSF_VICTIM_HASH["LOCATION"]]] = 1;	rescue;	next;	end;	end
 
 						table.each do |key, value|;	str << %Q{ {"value" : #{value.to_i}, "label": "#{key.to_s}", "on-click": "#{key.to_s}" },};	end
 						
-						code = %Q{	{ "elements": [ { "type": "pie", "start-angle": 50, "on-show": false, "animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
-												"colours" : [#{colours}], "gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
-												"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "XSSed domains",  "style": "color: #00EEEE; font-size: 20px" } }
+						code = %Q{	{ 	"elements": [ { "type": "pie", "start-angle": 50, "on-show": false, "animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
+									"colours" : [#{colours}], "gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
+									"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "XSSed domains",  "style": "color: #00EEEE; font-size: 20px" } }
 								}
 
 					when /^gr3$/			# Victim OS statistics
 						victims.each do |v|
 							begin
-								table[v.os_name] = Hash.new if not table[v.os_name]
-								table[v.os_name][v.os_version] ? table[v.os_name][v.os_version] += 1 : table[v.os_name][v.os_version] = 1
+								table[v[XSSF_VICTIM_HASH["OS_NAME"]]] = Hash.new if not table[v[XSSF_VICTIM_HASH["OS_NAME"]]]
+								table[v[XSSF_VICTIM_HASH["OS_NAME"]]][v[XSSF_VICTIM_HASH["OS_VERSION"]]] ? table[v[XSSF_VICTIM_HASH["OS_NAME"]]][v[XSSF_VICTIM_HASH["OS_VERSION"]]] += 1 : table[v[XSSF_VICTIM_HASH["OS_NAME"]]][v[XSSF_VICTIM_HASH["OS_VERSION"]]] = 1
 							rescue;	next; end
 						end
 
 
 						table.each do |key, value|;	value.each do |k, v|;	str << %Q{ {"value" : #{v.to_i}, "label": "#{key.to_s} [#{k.to_s}]" },};	end;	end
 						
-						code = %Q{ { "elements": [ { "type": "pie", "start-angle": 50, "on-show": false, "animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
-												"colours" : [#{colours}],"gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
-												"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "Operating Systems",  "style": "color: #00EEEE; font-size: 20px" } }
+						code = %Q{ { 	"elements": [ { "type": "pie", "start-angle": 50, "on-show": false, "animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
+								"colours" : [#{colours}],"gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
+								"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "Operating Systems",  "style": "color: #00EEEE; font-size: 20px" } }
 								}
 						
 					when /^gr4$/				# Victim browsers statistics
 						victims.each do |v|
 							begin
-								table[v.browser_name] = Hash.new if not table[v.browser_name]
-								table[v.browser_name][v.browser_version] ? table[v.browser_name][v.browser_version] += 1 : table[v.browser_name][v.browser_version] = 1
+								table[v[XSSF_VICTIM_HASH["BROWSER_NAME"]]] = Hash.new if not table[v[XSSF_VICTIM_HASH["BROWSER_NAME"]]]
+								table[v[XSSF_VICTIM_HASH["BROWSER_NAME"]]][v[XSSF_VICTIM_HASH["BROWSER_VERSION"]]] ? table[v[XSSF_VICTIM_HASH["BROWSER_NAME"]]][v[XSSF_VICTIM_HASH["BROWSER_VERSION"]]] += 1 : table[v[XSSF_VICTIM_HASH["BROWSER_NAME"]]][v[XSSF_VICTIM_HASH["BROWSER_VERSION"]]] = 1
 							rescue;	next; end
 						end
 
 						table.each do |key, value|;	value.each do |k, v|;	str << %Q{ {"value" : #{v.to_i}, "label": "#{key.to_s} [#{k.to_s}]" },};	end;	end
 						
-						code = %Q{ { "elements": [ { "type": "pie", "start-angle": 50, "on-show": false,	"animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
-												"colours" : [#{colours}], "gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
-												"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "XSSed browsers",  "style": "color: #00EEEE; font-size: 20px" } }
+						code = %Q{ { 	"elements": [ { "type": "pie", "start-angle": 50, "on-show": false,	"animate": [ { "type": "fade" }, { "type": "bounce", "distance": 20 } ],
+								"colours" : [#{colours}], "gradient-fill": true, "tip": "#label#\n#val# of #total# (#percent#)", "no-labels": true, 
+								"values": [ #{str[0..-2].to_s} ]}], "bg_colour" : "#000000", "title": { "text": "XSSed browsers",  "style": "color: #00EEEE; font-size: 20px" } }
 								}
 						
 					else						# Victim number evolution for the last 10 days
@@ -754,7 +969,7 @@ module Msf
 							
 						victims.each do |v|
 							table.each_key do |k|
-								time = Time.parse(v.first_request.to_s)
+								time = Time.parse(v[XSSF_VICTIM_HASH["FIRST_REQUEST"]])
 								table[k] += 1 if ((time.year == k.year) and (time.yday == k.yday))
 								max = table[k] if (table[k] > max)
 							end
@@ -780,8 +995,8 @@ module Msf
 			#
 			def browser_info(id)
 				begin
-					v = DBManager::XssfVictim.find(id)
-					return [v.browser_name.to_s, v.browser_version.to_f, v.os_version.to_s]
+					v = find(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ID" => id.to_i})
+					return [v[XSSF_VICTIM_HASH["BROWSER_NAME"]].to_s, v[XSSF_VICTIM_HASH["BROWSER_VERSION"]].to_f, v[XSSF_VICTIM_HASH["OS_VERSION"]].to_s]
 				rescue
 					print_error("Error 23: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
@@ -795,7 +1010,7 @@ module Msf
 			#
 			def get_log_content(logid)
 				begin
-					return File.open(INCLUDED_FILES + XSSF_LOG_FILES + DBManager::XssfLog.find(logid).result, "rb") {|io| io.read }
+					return File.open(INCLUDED_FILES + XSSF_LOG_FILES + find(XSSF_LOG_DB, XSSF_LOG_HASH, {"ID" => logid.to_i})[XSSF_LOG_HASH["RESULT"]], "rb") {|io| io.read }
 				rescue
 					print_error("Error 24: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 					return nil
@@ -826,22 +1041,22 @@ module Msf
 							($1..$2).each do |id|
 								case function
 									when "attack_victim"
-										attack_victim(id, url, name)
+										attack_victim(id.to_i, url, name)
 									when "remove_victim"
-										remove_victim(id)
+										remove_victim(id.to_i)
 									else #clean_victim
-										clean_victim(id)
+										clean_victim(id.to_i)
 								end
 							end
 						else
 							if (v =~ /^(\d+)$/)
 								case function
 									when "attack_victim"
-										attack_victim($1, url, name)
+										attack_victim($1.to_i, url, name)
 									when "remove_victim"
-										remove_victim($1)
+										remove_victim($1.to_i)
 									else #clean_victim
-										clean_victim($1)
+										clean_victim($1.to_i)
 								end
 							else
 								print_error("Wrong victim ID or range '#{v}'")
@@ -858,16 +1073,61 @@ module Msf
 			def remove_victim(id)
 				begin
 					if (id && (id != ''))
-						DBManager::XssfWaitingAttack.delete_all([ "xssf_victim_id = ?", id])
-						DBManager::XssfLog.delete_all([ "xssf_victim_id = ?", id])
-						DBManager::XssfVictim.delete(id)
+						delete(XSSF_WAITING_ATTACKS_DB, XSSF_WAITING_ATTACKS_HASH, {"VICTIM_ID" => id.to_i})
+						delete(XSSF_LOG_DB, XSSF_LOG_HASH, {"VICTIM_ID" => id.to_i})
+						delete(XSSF_VICTIM_DB, XSSF_VICTIM_HASH, {"ID" => id.to_i})
 					else
-						DBManager::XssfWaitingAttack.delete_all
-						DBManager::XssfLog.delete_all
-						DBManager::XssfVictim.delete_all
+						delete_all(XSSF_WAITING_ATTACKS_DB)
+						delete_all(XSSF_LOG_DB)
+						delete_all(XSSF_VICTIM_DB)
 					end
 				rescue
 					print_error("Error 25: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
+				end
+			end
+			
+			#
+			# Saves current database state into output file
+			#
+			def save_db(file)
+				begin
+					File.open(file,'w') do|f|
+						f.puts XSSF_SERVER_DB.to_yaml
+						f.puts XSSF_VICTIM_DB.to_yaml
+						f.puts XSSF_WAITING_ATTACKS_DB.to_yaml
+						f.puts XSSF_LOG_DB.to_yaml
+					end
+				rescue
+					print_error("Error 26: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
+				end
+			end
+			
+			#
+			# Recovers database state from input file
+			#
+			def restore_db(file)
+				begin
+					if File.exists?(file)
+						delete_all(XSSF_WAITING_ATTACKS_DB)
+						delete_all(XSSF_LOG_DB)
+						delete_all(XSSF_VICTIM_DB)
+						delete_all(XSSF_SERVER_DB)
+						
+						ctx = 0
+						
+						YAML.load_documents(File.read(file)) {|a|
+							XSSF_SERVER_DB.concat(a) if (ctx == 0)
+							XSSF_VICTIM_DB.concat(a) if (ctx == 1)
+							XSSF_WAITING_ATTACKS_DB.concat(a) if (ctx == 2)
+							XSSF_LOG_DB.concat(a) if (ctx == 3)
+						                                     
+							ctx = ctx + 1
+						}
+					else
+						raise "File not found..."
+					end
+				rescue
+					print_error("Error 26: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 			end
 		end

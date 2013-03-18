@@ -9,10 +9,10 @@ module Xssf
 
 		def initialize(info = {})
 			super(update_info(info,
-				'Name'        => 'XSSF MODULE',
-				'Description' => 'XSSF MODULE',
-				'Author'      => 'LuDo (CONIX Security)',
-				'License'     => MSF_LICENSE
+				'Name'        	=> 'XSSF MODULE',
+				'Description' 	=> 'XSSF MODULE',
+				'Author'	=> 'LuDo (CONIX Security)',
+				'License'     	=> MSF_LICENSE
 			))
 
 			register_options(
