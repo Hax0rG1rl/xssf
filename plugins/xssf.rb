@@ -26,17 +26,11 @@ module Msf
 			
 			uri = '/' + uri if (uri[0].chr  != "/")
 			uri = uri + '/' if (uri[-1].chr != "/")
-			
-			if (not framework.db.active)
-				print_error("The database backend has not been initialized ...")
-				print_status("Please connect MSF to an installed database before loading XSSF !")
-				raise PluginLoadError.new("Failed to connect to the database.")
-			end
 
 			framework.plugins.each { |p| raise PluginLoadError.new("This plugin should not be loaded more than once") if (p.class == Msf::Plugin::Xssf)	}
 			
 			begin
-				raise "Database Busy..." if not start(port, uri)
+				raise "Error starting attack server..." if not start(port, uri)
 				add_console_dispatcher(ConsoleCommandDispatcher)
 				print_error("Your Ruby version is #{RUBY_VERSION.to_s}. Make sure your version is up-to-date with the last non-vulnerable version before using XSSF!\n\n")
 				print_line("%cya" + Xssf::XssfBanner.to_s + "%clr\n\n")
